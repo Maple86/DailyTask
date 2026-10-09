@@ -1,0 +1,20 @@
+<view class="container">
+  <view class="card">
+    <view style="font-size: 36rpx; font-weight: 600;">绑定 Android 设备</view>
+    <view class="muted" style="margin-top: 16rpx;">
+      生成配对码后，在 DailyTask 的“设置 → 远程中继”中填写中继地址、设备名称和配对码。
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{code}}">
+    <view class="muted">6 位配对码</view>
+    <view style="margin: 24rpx 0; font-size: 72rpx; letter-spacing: 16rpx; font-weight: 700; color: #1677ff;">
+      {{code}}
+    </view>
+    <view class="muted">有效期至：{{expiresAt}}</view>
+    <button class="button-primary" bindtap="copyCode">复制配对码</button>
+    <button class="button-secondary" bindtap="generateCode">重新生成</button>
+  </view>
+
+  <button wx:else class="button-primary" loading="{{loading}}" bindtap="generateCode">生成配对码</button>
+</view>

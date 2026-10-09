@@ -1,0 +1,63 @@
+<view class="container" wx:if="{{device}}">
+  <view class="card">
+    <view class="row">
+      <view style="font-size: 36rpx; font-weight: 600;">{{device.deviceName || 'Android 设备'}}</view>
+      <view class="muted">{{device.lastSeenAt || '未同步'}}</view>
+    </view>
+    <view class="row">
+      <view>电量：{{device.battery >= 0 ? device.battery + '%' : '未知'}}</view>
+      <view>网络：{{device.networkType || '未知'}}</view>
+    </view>
+    <view class="row">
+      <view>任务：{{device.taskRunning ? '运行中' : '已停止'}}</view>
+      <view>通知监听：{{device.notificationListenerAlive ? '正常' : '断开'}}</view>
+    </view>
+    <view class="row">
+      <view>循环：{{config.autoRecycle ? '已开启' : '已关闭'}}</view>
+      <view>配置版本：{{configRevision}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view style="font-weight: 600; margin-bottom: 20rpx;">快捷操作</view>
+    <button class="button-primary" loading="{{commandLoading}}" data-type="START_TASK" bindtap="createCommand">启动任务</button>
+    <button class="button-secondary" loading="{{commandLoading}}" data-type="STOP_TASK" bindtap="createCommand">停止任务</button>
+    <button class="button-secondary" loading="{{commandLoading}}" data-type="TRIGGER_CLOCK_IN" bindtap="createCommand">立即打卡</button>
+    <button class="button-secondary" bindtap="toggleLoop">{{config.autoRecycle ? '关闭循环' : '开启循环'}}</button>
+  </view>
+
+  <view class="card">
+    <view class="row">
+      <view style="font-weight: 600;">最近指令</view>
+      <view class="muted" bindtap="load">刷新</view>
+    </view>
+    <view wx:if="{{commands.length === 0}}" class="muted">暂无指令</view>
+    <view wx:for="{{commands}}" wx:key="_id" class="row" style="align-items: flex-start;">
+      <view>
+        <view>{{item.type}}</view>
+        <view class="muted">{{item.createdAt}}</view>
+      </view>
+      <view class="{{item.status === 'SUCCEEDED' ? 'success' : (item.status === 'FAILED' ? 'danger' : 'primary')}}">{{item.status}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="row">
+      <view style="font-weight: 600;">当天打卡记录</view>
+      <view class="primary" bindtap="openRecords">查看全部</view>
+    </view>
+    <view wx:if="{{attendance.length === 0}}" class="muted">暂无记录</view>
+    <view wx:for="{{attendance}}" wx:key="_id" class="row">
+      <view>{{item.title || item.recordType}}</view>
+      <view class="muted">{{item.occurredAt}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <button class="button-secondary" bindtap="openConfig">任务与工作日配置</button>
+    <button class="button-secondary" bindtap="unbindDevice">解除绑定</button>
+  </view>
+</view>
+
+<view wx:else class="empty">正在加载设备信息...</view>
+

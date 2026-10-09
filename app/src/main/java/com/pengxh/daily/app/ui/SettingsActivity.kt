@@ -291,6 +291,9 @@ class SettingsActivity : KotlinBaseActivity<ActivitySettingsBinding>() {
             projectionLauncher.launch(mpr.createScreenCaptureIntent())
         }
 
+        binding.remoteRelayLayout.setOnClickListener {
+            navigatePageTo<RemoteRelayActivity>()
+        }
         binding.commandLayout.setOnClickListener {
             navigatePageTo<CommandActivity>()
         }

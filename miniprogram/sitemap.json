@@ -1,0 +1,9 @@
+{
+  "desc": "DailyTask 远程中继控制台",
+  "rules": [
+    {
+      "action": "disallow",
+      "page": "*"
+    }
+  ]
+}

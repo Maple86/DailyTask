@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.pengxh.daily.app.R
+import com.pengxh.daily.app.remote.RemoteRelayCoordinator
 import com.pengxh.daily.app.utils.Constant
 import com.pengxh.daily.app.utils.LogFileManager
 import com.pengxh.daily.app.utils.MessageDispatcher
@@ -79,6 +80,7 @@ class ForegroundRunningService : Service() {
         super.onCreate()
         // 注入协程作用域给 TaskScheduler
         TaskScheduler.attach(serviceScope)
+        RemoteRelayCoordinator.start(serviceScope)
 
         val name = "${resources.getString(R.string.app_name)}前台服务"
         val channel = NotificationChannel(
@@ -146,6 +148,7 @@ class ForegroundRunningService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         checkLowBattery()
+        RemoteRelayCoordinator.syncNow()
         return START_STICKY
     }
 
@@ -267,6 +270,7 @@ class ForegroundRunningService : Service() {
             Constant.FOREGROUND_RUNNING_SERVICE_NOTIFICATION_ID, notification
         )
 
+        RemoteRelayCoordinator.stop()
         serviceScope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
     }

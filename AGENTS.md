@@ -6,6 +6,8 @@
 - `lite/`：供 `app` 使用的通用 Android 库。共享 UI、网络、Socket 和扩展工具应优先放在这里。
 - `design/`、`screenshot/`：设计原型和文档图片。行为或架构变化时，同步更新 `README.md`、`CHANGELOG.md` 或 `REVIEW.md`。
 - `app/src/test/java/`：JVM 单元测试目录，当前使用 JUnit 4 覆盖工作日计划等纯逻辑；项目仍没有 `androidTest/` 设备测试目录。
+- cloudfunctions/relay/：CloudBase 云函数，负责设备配对、配置 revision、指令队列和考勤记录。
+- miniprogram/：微信小程序控制台，只通过云函数读写数据，不直接连接 Android。
 
 ## 构建、测试与开发命令
 开发环境需使用 JDK 17 和 Android SDK 36。
@@ -37,9 +39,29 @@
 
 ## 安全与配置说明
 谨慎处理通知访问、屏幕投射、悬浮窗和前台服务逻辑。未经讨论，不要引入分析上报、远程上传或新的密钥。发布密钥库和签名参数已纳入仓库，不要擅自更换。修改调度、截屏、遮罩或服务生命周期前，先阅读 `REVIEW.md`。
+远程中继依赖 HTTPS、设备 Token 和云函数权限校验；禁止把 Token、邮箱授权码或企业微信 Webhook Key 写入日志、导出配置或小程序。
 
 ## 变更记忆
+
 > 每次提交或完成功能后在此追加，最新记录置顶。
+
+### 2026-10-09 修复远程配对主线程数据库异常
+- `RemoteConfigManager.snapshot()` 在配对阶段读取 Room 任务表时触发 `Cannot access database on the main thread`，导致首次配对失败。
+- 任务快照和任务替换现在显式切换到 `Dispatchers.IO` 执行，配对请求构造不再阻塞主线程。
+- 验证：JDK 17 下 `testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 通过。
+
+### 2026-10-09 开发 CloudBase 远程中继首版
+- 新增 `cloudfunctions/relay`：实现设备配对、Token 哈希、配置 revision、指令队列、ACK、考勤去重上报和小程序云函数接口。
+- 新增 `miniprogram`：提供设备列表、配对、状态查看、启动/停止任务、立即打卡、循环开关、考勤查询和任务/工作日配置页面。
+- Android 新增 `remote` 包：`RemoteRelayStore`、`RemoteRelayClient`、`RemoteRelayCoordinator`、`RemoteConfigManager`、`RemoteCommandProcessor`、`RemoteSyncWorker` 和 `RemoteSyncScheduler`。
+- `ForegroundRunningService` 集成 60 秒同步循环，WorkManager 提供 15 分钟兜底；新增开机广播 `BootReceiver`。
+- `NotificationMonitorService` 将目标应用打卡通知转换为云端考勤记录，并按 `dedupeKey` 防止重复上报。
+- 设置页新增「远程中继」入口，可填写 HTTPS 地址、设备名称和 6 位配对码。
+- 保留旧 `DT#` 聊天指令作为过渡，邮件和企业微信 Webhook 仍负责结果通知，邮件授权码与 Webhook Key 不上传云端。
+- .gitignore 增加 cloudfunctions/**/node_modules/ 和 miniprogram_npm/ 忽略规则。
+- CloudBase HTTP 访问优先使用环境自带的免费默认域名；默认域名有频率、有效期和稳定性限制，自定义域名属于付费套餐能力。
+- 验证：JDK 17 下执行 `testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 通过；小程序和云函数 JavaScript 已通过 `node --check`，JSON 文件解析通过。
+
 
 ### 2026-10-09 修复大小周本周类型选项未显示
 - 将「选择本周类型」弹窗从 `setSingleChoiceItems()` 改为 `dialog_work_week_type.xml` 自定义 `RadioGroup`，确保“本周是小周 / 本周是大周”两个选项稳定展示。

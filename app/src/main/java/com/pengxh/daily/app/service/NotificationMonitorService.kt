@@ -10,6 +10,7 @@ import com.pengxh.daily.app.extensions.openApplication
 import com.pengxh.daily.app.sqlite.DatabaseWrapper
 import com.pengxh.daily.app.sqlite.bean.NotificationBean
 import com.pengxh.daily.app.utils.Constant
+import com.pengxh.daily.app.remote.RemoteRelayCoordinator
 import com.pengxh.daily.app.utils.MessageDispatcher
 import com.pengxh.daily.app.utils.MonitorEvent
 import com.pengxh.daily.app.utils.ProjectionSession
@@ -89,6 +90,10 @@ class NotificationMonitorService : NotificationListenerService() {
         // 保存指定包名的通知，其他的一律不保存
         saveTargetNotice(pkg, targetApp, title, notice)
 
+        if (pkg == targetApp && (notice.contains("打卡") || notice.contains("考勤"))) {
+            reportAttendance(sbn, title, notice)
+        }
+
         // 截屏模式选中 + 钉钉手动打卡 → 通知被第 99 行拦截，仅测试场景会出现
         // 目标应用打卡通知，如果设置通知监听，那么结果来源只能选通知监听。
         if (SaveKeyValues.loadInt(Constant.RESULT_SOURCE_KEY, Constant.DEFAULT_INDEX) == 0) {
@@ -103,6 +108,27 @@ class NotificationMonitorService : NotificationListenerService() {
 
         // 其他消息指令
         handleRemoteCommand(pkg, notice)
+    }
+
+    private fun reportAttendance(sbn: StatusBarNotification, title: String, notice: String) {
+        val result = when {
+            notice.contains("成功") -> "SUCCESS"
+            notice.contains("失败") -> "FAILED"
+            else -> "UNKNOWN"
+        }
+        val occurredAt = System.currentTimeMillis().timestampToCompleteDate()
+        val dedupeKey = "${sbn.packageName}|${sbn.postTime}|${notice.hashCode()}"
+        val record = com.google.gson.JsonObject().apply {
+            addProperty("businessDate", java.time.LocalDate.now().toString())
+            addProperty("targetPackage", sbn.packageName)
+            addProperty("result", result)
+            addProperty("recordType", "AUTO")
+            addProperty("occurredAt", occurredAt)
+            addProperty("title", title)
+            addProperty("message", notice)
+            addProperty("dedupeKey", dedupeKey)
+        }
+        RemoteRelayCoordinator.reportAttendance(record)
     }
 
     private fun saveTargetNotice(pkg: String, targetApp: String, title: String, notice: String) {

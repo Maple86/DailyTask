@@ -1,0 +1,9 @@
+.tasks-input {
+  width: 100%;
+  min-height: 220rpx;
+  margin-top: 16rpx;
+  padding: 16rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #dfe3e8;
+  border-radius: 12rpx;
+}

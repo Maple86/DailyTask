@@ -6,6 +6,8 @@ import androidx.room.Room.databaseBuilder
 import com.pengxh.daily.app.sqlite.DailyTaskDataBase
 import com.pengxh.daily.app.utils.ConfigStore
 import com.pengxh.daily.app.utils.LogFileManager
+import com.pengxh.daily.app.remote.RemoteRelayCoordinator
+import com.pengxh.daily.app.remote.RemoteSyncScheduler
 import com.pengxh.daily.app.utils.MessageDispatcher
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import java.io.File
@@ -36,6 +38,8 @@ class DailyTaskApplication : Application() {
         initApplication(this)
         SaveKeyValues.initialize(this)
         MessageDispatcher.initialize(this)
+        RemoteRelayCoordinator.initialize(this)
+        RemoteSyncScheduler.schedule(this)
         LogFileManager.initLogFile(this)
 
         // 初始化配置文件

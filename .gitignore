@@ -72,3 +72,8 @@ lint/tmp/
 # lint/reports/
 
 /apk
+
+# Cloud functions / miniprogram dependencies
+cloudfunctions/**/node_modules/
+miniprogram_npm/
+project.private.config.json

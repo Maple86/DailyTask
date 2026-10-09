@@ -1,0 +1,67 @@
+<view class="container">
+  <view class="card">
+    <view class="row">
+      <view style="font-size: 36rpx; font-weight: 600;">任务与工作日</view>
+      <view class="muted">版本 {{revision}}</view>
+    </view>
+    <view class="muted">Android 下次同步时会自动应用配置，敏感凭证仍保留在手机本地。</view>
+  </view>
+
+  <view class="card">
+    <view class="row">
+      <view>重置时间</view>
+      <picker mode="selector" range="{{resetHours}}" value="{{resetHourIndex}}" bindchange="onResetHourChange">
+        <view class="primary">{{resetHours[resetHourIndex]}}</view>
+      </picker>
+    </view>
+    <view class="row">
+      <view>目标应用</view>
+      <picker mode="selector" range="{{targetApps}}" value="{{targetAppIndex}}" bindchange="onTargetAppChange">
+        <view class="primary">{{targetApps[targetAppIndex]}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="row"><view>每日自动循环</view><switch checked="{{autoRecycle}}" bindchange="onAutoRecycleChange" /></view>
+    <view class="row"><view>随机任务时间</view><switch checked="{{randomTime}}" bindchange="onRandomTimeChange" /></view>
+    <view class="row"><view>跳过节假日</view><switch checked="{{skipHoliday}}" bindchange="onSkipHolidayChange" /></view>
+    <view class="row"><view>省电模式</view><switch checked="{{powerSave}}" bindchange="onPowerSaveChange" /></view>
+  </view>
+
+  <view class="card">
+    <view class="row">
+      <view style="font-weight: 600;">工作日模式</view>
+      <picker mode="selector" range="{{workdayModes}}" value="{{workdayModeIndex}}" bindchange="onWorkdayModeChange">
+        <view class="primary">{{workdayModeIndex === 0 ? '每周固定' : '大小周'}}</view>
+      </picker>
+    </view>
+    <view wx:if="{{workdayModeIndex === 1}}" class="row">
+      <view>本周类型</view>
+      <picker mode="selector" range="{{weekTypes}}" value="{{weekTypeIndex}}" bindchange="onWeekTypeChange">
+        <view class="primary">{{weekTypeIndex === 0 ? '本周小周' : '本周大周'}}</view>
+      </picker>
+    </view>
+    <view style="margin-top: 16rpx;">
+      <view class="muted">固定工作日；大小周模式下作为小周工作日，大周默认增加周六。</view>
+      <checkbox-group bindchange="onWeekdayChange">
+        <label wx:for="{{weekdayOptions}}" wx:key="value" style="display: inline-block; margin: 12rpx 20rpx 0 0;">
+          <checkbox value="{{item.value}}" checked="{{item.checked}}" />{{item.label}}
+        </label>
+      </checkbox-group>
+    </view>
+  </view>
+
+  <view class="card">
+    <view style="font-weight: 600; margin-bottom: 12rpx;">任务时间</view>
+    <view class="muted">每行一个时间，格式 HH:mm:ss</view>
+    <textarea
+      class="tasks-input"
+      value="{{tasksText}}"
+      placeholder="08:55:00&#10;18:05:00"
+      bindinput="onTasksInput" />
+  </view>
+
+  <button class="button-primary" loading="{{loading}}" bindtap="save">保存配置</button>
+</view>
+

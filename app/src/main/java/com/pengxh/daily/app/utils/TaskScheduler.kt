@@ -68,6 +68,10 @@ object TaskScheduler {
         scope = serviceScope
     }
 
+    fun isAttached(): Boolean {
+        return scope != null
+    }
+
     fun isRunning(): Boolean {
         return _isRunning.value
     }

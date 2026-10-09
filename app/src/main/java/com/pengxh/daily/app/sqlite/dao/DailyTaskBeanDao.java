@@ -26,4 +26,7 @@ public interface DailyTaskBeanDao {
 
     @Insert
     void insert(DailyTaskBean bean);
+
+    @Query("DELETE FROM daily_task_table")
+    void deleteAll();
 }

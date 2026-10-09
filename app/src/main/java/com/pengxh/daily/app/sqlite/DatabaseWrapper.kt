@@ -28,6 +28,11 @@ object DatabaseWrapper {
         dailyTaskDao.insert(bean)
     }
 
+    suspend fun replaceAllTasks(tasks: List<DailyTaskBean>) {
+        dailyTaskDao.deleteAll()
+        tasks.forEach { dailyTaskDao.insert(it) }
+    }
+
     /*****************************************************************************************/
     private val noticeDao by lazy { DailyTaskApplication.get().dataBase.noticeDao() }
 

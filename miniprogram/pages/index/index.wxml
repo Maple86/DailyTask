@@ -1,0 +1,30 @@
+<view class="container">
+  <view class="card">
+    <view class="row">
+      <view>
+        <view style="font-size: 36rpx; font-weight: 600;">设备列表</view>
+        <view class="muted">通过云端中继控制 DailyTask</view>
+      </view>
+      <button size="mini" class="button-secondary" bindtap="addDevice">添加设备</button>
+    </view>
+  </view>
+
+  <view wx:if="{{devices.length === 0 && !loading}}" class="empty">还没有绑定设备</view>
+
+  <view
+    wx:for="{{devices}}"
+    wx:key="deviceId"
+    class="card"
+    data-device-id="{{item.deviceId}}"
+    bindtap="openDevice">
+    <view class="row">
+      <view style="font-weight: 600;">{{item.deviceName || item.deviceModel || 'Android 设备'}}</view>
+      <view class="{{item.lastSeenAt ? 'success' : 'muted'}}">{{item.lastSeenAt ? '已连接' : '未同步'}}</view>
+    </view>
+    <view class="row muted">
+      <view>电量：{{item.battery >= 0 ? item.battery + '%' : '未知'}}</view>
+      <view>任务：{{item.taskRunning ? '运行中' : '已停止'}}</view>
+    </view>
+    <view class="muted">最后在线：{{item.lastSeenAt || '暂无'}}</view>
+  </view>
+</view>

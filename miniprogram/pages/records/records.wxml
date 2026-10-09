@@ -1,0 +1,24 @@
+<view class="container">
+  <view class="card">
+    <view class="row">
+      <view style="font-weight: 600;">打卡记录</view>
+      <picker mode="date" value="{{date}}" bindchange="onDateChange">
+        <view class="primary">{{date || '选择日期'}}</view>
+      </picker>
+    </view>
+    <view wx:if="{{date}}" class="muted" bindtap="clearDate">清除日期筛选</view>
+  </view>
+
+  <view wx:if="{{records.length === 0}}" class="empty">暂无打卡记录</view>
+
+  <view wx:for="{{records}}" wx:key="_id" class="card">
+    <view class="row">
+      <view style="font-weight: 600;">{{item.title || item.recordType}}</view>
+      <view class="{{item.result === 'SUCCESS' ? 'success' : (item.result === 'FAILED' ? 'danger' : 'muted')}}">
+        {{item.result}}
+      </view>
+    </view>
+    <view>{{item.message}}</view>
+    <view class="muted" style="margin-top: 12rpx;">{{item.occurredAt}}</view>
+  </view>
+</view>
