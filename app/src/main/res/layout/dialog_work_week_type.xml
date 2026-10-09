@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/dp_24"
+    android:paddingTop="@dimen/dp_8"
+    android:paddingEnd="@dimen/dp_24">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="大小周按周交替，请选择当前所在周的类型。"
+        android:textColor="@color/text_default_color"
+        android:textSize="@dimen/sp_14" />
+
+    <RadioGroup
+        android:id="@+id/weekTypeRadioGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/dp_8"
+        android:orientation="vertical">
+
+        <com.google.android.material.radiobutton.MaterialRadioButton
+            android:id="@+id/smallWeekRadioButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="@dimen/dp_48"
+            android:text="本周是小周"
+            android:textSize="@dimen/sp_16" />
+
+        <com.google.android.material.radiobutton.MaterialRadioButton
+            android:id="@+id/bigWeekRadioButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="@dimen/dp_48"
+            android:text="本周是大周"
+            android:textSize="@dimen/sp_16" />
+    </RadioGroup>
+</LinearLayout>

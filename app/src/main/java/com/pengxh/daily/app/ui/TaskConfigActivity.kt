@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.pengxh.daily.app.R
 import com.pengxh.daily.app.databinding.ActivityTaskConfigBinding
+import com.pengxh.daily.app.databinding.DialogWorkWeekTypeBinding
 import com.pengxh.daily.app.extensions.isApplicationExist
 import com.pengxh.daily.app.model.ExportDataModel
 import com.pengxh.daily.app.service.ForegroundRunningService
@@ -21,6 +22,10 @@ import com.pengxh.daily.app.utils.ConfigStore
 import com.pengxh.daily.app.utils.Constant
 import com.pengxh.daily.app.utils.CustomWorkdayManager
 import com.pengxh.daily.app.utils.FloatingWindowController
+import com.pengxh.daily.app.utils.WorkWeekType
+import com.pengxh.daily.app.utils.WorkdayMode
+import com.pengxh.daily.app.utils.WorkdaySchedule
+import com.pengxh.daily.app.utils.WorkdayScheduleResolver
 import com.pengxh.kt.lite.base.KotlinBaseActivity
 import com.pengxh.kt.lite.extensions.convertColor
 import com.pengxh.kt.lite.extensions.isNumber
@@ -33,6 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.DayOfWeek
+import java.time.LocalDate
 
 class TaskConfigActivity : KotlinBaseActivity<ActivityTaskConfigBinding>() {
 
@@ -69,7 +75,7 @@ class TaskConfigActivity : KotlinBaseActivity<ActivityTaskConfigBinding>() {
 
         binding.keyTextView.text = SaveKeyValues.loadString(Constant.REMOTE_COMMAND_KEY, "打卡")
 
-        updateCustomWorkdaySummary(CustomWorkdayManager.loadWorkdays())
+        updateWorkdaySummary(CustomWorkdayManager.loadSchedule())
 
         binding.autoTaskSwitch.isChecked =
             SaveKeyValues.loadBoolean(Constant.TASK_AUTO_RECYCLE_KEY, true)
@@ -132,7 +138,7 @@ class TaskConfigActivity : KotlinBaseActivity<ActivityTaskConfigBinding>() {
         }
 
         binding.workdayLayout.setOnClickListener {
-            showWorkdaySelector()
+            showWorkdayModeSelector()
         }
 
         binding.randomTimeSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -191,9 +197,18 @@ class TaskConfigActivity : KotlinBaseActivity<ActivityTaskConfigBinding>() {
             exportData.msgTitle =
                 SaveKeyValues.loadString(Constant.MESSAGE_TITLE_KEY, "打卡结果通知")
             exportData.wxKey = SaveKeyValues.loadString(Constant.WX_WEB_HOOK_KEY, "")
+            val workdaySchedule = CustomWorkdayManager.loadSchedule()
             exportData.customWorkdays = CustomWorkdayManager.serializeWorkdays(
-                CustomWorkdayManager.loadWorkdays()
+                CustomWorkdayManager.getLegacyExportWorkdays(workdaySchedule)
             )
+            exportData.workdayMode = workdaySchedule.mode.name
+            exportData.smallWeekWorkdays = CustomWorkdayManager.serializeWorkdays(
+                workdaySchedule.smallWeekWorkdays
+            )
+            exportData.bigWeekWorkdays = CustomWorkdayManager.serializeWorkdays(
+                workdaySchedule.bigWeekWorkdays
+            )
+            exportData.bigWeekAnchorMonday = workdaySchedule.bigWeekAnchorMonday?.toString().orEmpty()
 
             // Boolean
             exportData.isDetectGesture =
@@ -253,14 +268,93 @@ class TaskConfigActivity : KotlinBaseActivity<ActivityTaskConfigBinding>() {
         }
     }
 
-    private fun showWorkdaySelector() {
+    private fun showWorkdayModeSelector() {
+        val schedule = CustomWorkdayManager.loadSchedule()
+        val selectedIndex = if (schedule.mode == WorkdayMode.ALTERNATING) 1 else 0
+        MaterialAlertDialogBuilder(this)
+            .setTitle("工作日模式")
+            .setSingleChoiceItems(
+                arrayOf("每周固定", "大小周"), selectedIndex
+            ) { dialog, which ->
+                dialog.dismiss()
+                if (which == 0) {
+                    showFixedWorkdaySelector(schedule)
+                } else {
+                    showSmallWeekSelector(schedule)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showFixedWorkdaySelector(schedule: WorkdaySchedule) {
+        showWeekdayMultiSelector("选择每周工作日", schedule.fixedWorkdays) { selectedDays ->
+            val updated = schedule.copy(
+                mode = WorkdayMode.FIXED, fixedWorkdays = selectedDays
+            )
+            CustomWorkdayManager.saveSchedule(updated)
+            updateWorkdaySummary(updated)
+        }
+    }
+
+    private fun showSmallWeekSelector(schedule: WorkdaySchedule) {
+        val defaults = CustomWorkdayManager.createAlternatingDefaults(schedule)
+        showWeekdayMultiSelector("选择小周工作日", defaults.smallWeekWorkdays) { selectedDays ->
+            showBigWeekSelector(defaults.copy(smallWeekWorkdays = selectedDays))
+        }
+    }
+
+    private fun showBigWeekSelector(schedule: WorkdaySchedule) {
+        showWeekdayMultiSelector("选择大周工作日", schedule.bigWeekWorkdays) { selectedDays ->
+            showCurrentWeekTypeSelector(schedule.copy(bigWeekWorkdays = selectedDays))
+        }
+    }
+
+    private fun showCurrentWeekTypeSelector(schedule: WorkdaySchedule) {
+        val currentWeekType = WorkdayScheduleResolver.resolveWeekType(
+            schedule, LocalDate.now()
+        ) ?: WorkWeekType.SMALL
+        val dialogBinding = DialogWorkWeekTypeBinding.inflate(layoutInflater)
+        if (currentWeekType == WorkWeekType.BIG) {
+            dialogBinding.bigWeekRadioButton.isChecked = true
+        } else {
+            dialogBinding.smallWeekRadioButton.isChecked = true
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("选择本周类型")
+            .setView(dialogBinding.root)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("保存") { _, _ ->
+                val selectedWeekType = if (dialogBinding.bigWeekRadioButton.isChecked) {
+                    WorkWeekType.BIG
+                } else {
+                    WorkWeekType.SMALL
+                }
+                val updated = schedule.copy(
+                    mode = WorkdayMode.ALTERNATING,
+                    bigWeekAnchorMonday = CustomWorkdayManager.createBigWeekAnchor(
+                        selectedWeekType
+                    )
+                )
+                CustomWorkdayManager.saveSchedule(updated)
+                updateWorkdaySummary(updated)
+            }
+            .show()
+    }
+
+    private fun showWeekdayMultiSelector(
+        title: String,
+        initialDays: Set<DayOfWeek>,
+        onConfirm: (Set<DayOfWeek>) -> Unit
+    ) {
         val orderedDays = CustomWorkdayManager.getOrderedDays()
-        val selectedDays = CustomWorkdayManager.loadWorkdays().toMutableSet()
+        val selectedDays = initialDays.toMutableSet()
         val labels = orderedDays.map { CustomWorkdayManager.getDayLabel(it) }.toTypedArray()
         val checkedItems = orderedDays.map { it in selectedDays }.toBooleanArray()
 
         MaterialAlertDialogBuilder(this)
-            .setTitle("选择工作日")
+            .setTitle(title)
             .setMultiChoiceItems(labels, checkedItems) { _, which, isChecked ->
                 val day = orderedDays[which]
                 if (isChecked) {
@@ -277,14 +371,13 @@ class TaskConfigActivity : KotlinBaseActivity<ActivityTaskConfigBinding>() {
                 }
 
                 val normalized = orderedDays.filter { it in selectedDays }.toSet()
-                CustomWorkdayManager.saveWorkdays(normalized)
-                updateCustomWorkdaySummary(normalized)
+                onConfirm(normalized)
             }
             .show()
     }
 
-    private fun updateCustomWorkdaySummary(workdays: Set<DayOfWeek>) {
-        binding.workdayValueView.text = CustomWorkdayManager.formatWorkdays(workdays)
+    private fun updateWorkdaySummary(schedule: WorkdaySchedule) {
+        binding.workdayValueView.text = CustomWorkdayManager.formatSchedule(schedule)
     }
 
     private fun setHourByPosition(position: Int) {

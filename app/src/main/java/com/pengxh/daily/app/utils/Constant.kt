@@ -21,6 +21,10 @@ object Constant {
     const val MESSAGE_TITLE_KEY = "MESSAGE_TITLE_KEY" // 打卡消息标题(String)
     const val WX_WEB_HOOK_KEY = "WX_WEB_HOOK_KEY" // 企业微信消息Key(String)
     const val CUSTOM_WORKDAYS_KEY = "CUSTOM_WORKDAYS_KEY" // 自定义工作日(String)
+    const val WORKDAY_MODE_KEY = "WORKDAY_MODE_KEY" // 工作日模式：FIXED / ALTERNATING(String)
+    const val WORKDAY_SMALL_WEEK_KEY = "WORKDAY_SMALL_WEEK_KEY" // 小周工作日(String)
+    const val WORKDAY_BIG_WEEK_KEY = "WORKDAY_BIG_WEEK_KEY" // 大周工作日(String)
+    const val WORKDAY_BIG_WEEK_ANCHOR_KEY = "WORKDAY_BIG_WEEK_ANCHOR_KEY" // 大周基准周一(yyyy-MM-dd)
 
     const val GESTURE_DETECTOR_KEY = "GESTURE_DETECTOR_KEY" // 检测手势(Boolean)
     const val BACK_TO_HOME_KEY = "BACK_TO_HOME_KEY" // 返回桌面(Boolean)

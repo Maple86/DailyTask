@@ -20,6 +20,10 @@ public class ExportDataModel {
     private String msgTitle; // 打卡消息标题
     private String wxKey; // 企业微信消息Key
     private String customWorkdays; // 自定义工作日
+    private String workdayMode; // FIXED / ALTERNATING
+    private String smallWeekWorkdays; // 小周工作日
+    private String bigWeekWorkdays; // 大周工作日
+    private String bigWeekAnchorMonday; // 大周基准周一，格式 yyyy-MM-dd
 
     private boolean detectGesture; // 检测手势
     private boolean backToHome; // 返回桌面
@@ -101,6 +105,38 @@ public class ExportDataModel {
 
     public void setCustomWorkdays(String customWorkdays) {
         this.customWorkdays = customWorkdays;
+    }
+
+    public String getWorkdayMode() {
+        return workdayMode;
+    }
+
+    public void setWorkdayMode(String workdayMode) {
+        this.workdayMode = workdayMode;
+    }
+
+    public String getSmallWeekWorkdays() {
+        return smallWeekWorkdays;
+    }
+
+    public void setSmallWeekWorkdays(String smallWeekWorkdays) {
+        this.smallWeekWorkdays = smallWeekWorkdays;
+    }
+
+    public String getBigWeekWorkdays() {
+        return bigWeekWorkdays;
+    }
+
+    public void setBigWeekWorkdays(String bigWeekWorkdays) {
+        this.bigWeekWorkdays = bigWeekWorkdays;
+    }
+
+    public String getBigWeekAnchorMonday() {
+        return bigWeekAnchorMonday;
+    }
+
+    public void setBigWeekAnchorMonday(String bigWeekAnchorMonday) {
+        this.bigWeekAnchorMonday = bigWeekAnchorMonday;
     }
 
 

@@ -134,8 +134,8 @@ object TaskScheduler {
         val today = LocalDate.now()
         return when {
             ChinaHolidayManager.isWorkday(today) -> "补班日"
-            CustomWorkdayManager.isWeekdayRestDay(today) -> "休息日"
             ChinaHolidayManager.isHoliday(today) -> "节假日"
+            CustomWorkdayManager.isRestDay(today) -> "休息日"
             else -> "工作日"
         }
     }
@@ -366,8 +366,8 @@ object TaskScheduler {
             return true
         }
 
-        // 一周休息日（默认周六日双休，用户可修改）→ 跳过
-        if (CustomWorkdayManager.isWeekdayRestDay(today)) {
+        // 固定工作日或大小周休息日 → 跳过
+        if (CustomWorkdayManager.isRestDay(today)) {
             LogFileManager.writeLog("今日为休息日，跳过任务")
             return true
         }

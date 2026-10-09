@@ -5,7 +5,7 @@
 - `app/src/main/res/`：布局、图标、主题、字符串等资源；`app/src/main/assets/` 存放随应用打包的 JSON 数据。
 - `lite/`：供 `app` 使用的通用 Android 库。共享 UI、网络、Socket 和扩展工具应优先放在这里。
 - `design/`、`screenshot/`：设计原型和文档图片。行为或架构变化时，同步更新 `README.md`、`CHANGELOG.md` 或 `REVIEW.md`。
-- 当前项目没有 `test/` 或 `androidTest/` 测试目录。
+- `app/src/test/java/`：JVM 单元测试目录，当前使用 JUnit 4 覆盖工作日计划等纯逻辑；项目仍没有 `androidTest/` 设备测试目录。
 
 ## 构建、测试与开发命令
 开发环境需使用 JDK 17 和 Android SDK 36。
@@ -23,7 +23,7 @@
 遵循 Android/Kotlin 官方风格，统一使用四空格缩进。新代码优先使用 Kotlin；仅在延续现有 Java 数据库实体或兼容代码时保留 Java。类使用 `PascalCase`，函数和属性使用 `camelCase`，常量使用 `UPPER_SNAKE_CASE`。资源文件使用 `activity_main.xml`、`widget_view_keyboard.xml` 等小写下划线命名。Activity、Fragment 和 Service 应带角色后缀；提交前使用 Android Studio 格式化并运行 Lint。
 
 ## 测试指南
-项目目前没有自动化测试框架，也未设置覆盖率门槛。新增测试时，JVM 测试放在 `app/src/test/java/`，设备测试放在 `app/src/androidTest/java/`，并补充相应依赖。测试类命名为 `FeatureBehaviorTest`，方法采用 `methodUnderTest_condition_expectedResult`。分别运行 `.\gradlew.bat testDebugUnitTest` 和 `connectedDebugAndroidTest`。通知监听、定时调度、截屏、悬浮窗、前台服务及权限流程必须在真机上手动验证。
+项目当前使用 JUnit 4 编写 JVM 测试，未设置覆盖率门槛。新增测试时，JVM 测试放在 `app/src/test/java/`，设备测试放在 `app/src/androidTest/java/`，并补充相应依赖。测试类命名为 `FeatureBehaviorTest`，方法采用 `methodUnderTest_condition_expectedResult`。分别运行 `.\gradlew.bat testDebugUnitTest` 和 `connectedDebugAndroidTest`。通知监听、定时调度、截屏、悬浮窗、前台服务及权限流程必须在真机上手动验证。
 
 ## 提交与 Pull Request 规范
 提交信息遵循 Conventional Commits，可带模块范围，例如 `feat(design): ...`、`fix(service): ...`、`refactor(scheduler): ...` 或 `chore: ...`；中文描述可以使用。每个提交应保持单一目的。PR 需说明行为变化、风险和验证方式，关联相关 Issue；涉及 UI 或权限流程时附截图或录屏，并注明测试设备与 Android 版本。
@@ -40,6 +40,21 @@
 
 ## 变更记忆
 > 每次提交或完成功能后在此追加，最新记录置顶。
+
+### 2026-10-09 修复大小周本周类型选项未显示
+- 将「选择本周类型」弹窗从 `setSingleChoiceItems()` 改为 `dialog_work_week_type.xml` 自定义 `RadioGroup`，确保“本周是小周 / 本周是大周”两个选项稳定展示。
+- `TaskConfigActivity.kt` 通过 `DialogWorkWeekTypeBinding` 读取选中项，再计算大周锚点并保存，取消操作仍不写入配置。
+- 验证方式：执行 `testDebugUnitTest`、`:app:lintDebug`、`assembleDebug`，并在真机确认弹窗包含两个单选项。
+
+### 2026-10-09 工作日设置支持大小周
+- 新增 `WorkdayScheduleResolver.kt`，用纯日期逻辑统一处理固定工作日和大小周交替；大周锚点按周一存储，支持跨月、跨年计算。
+- `CustomWorkdayManager.kt` 新增模式、小周工作日、大周工作日和大周锚点配置，同时保留 `CUSTOM_WORKDAYS_KEY` 作为旧版固定工作日兼容层。
+- `TaskScheduler.kt` 统一使用 `isRestDay()`；节假日显示/跳过优先级调整为“补班日 > 节假日 > 工作制休息日 > 工作日”。
+- `TaskConfigActivity.kt` 增加“每周固定 / 大小周”模式选择，并按“小周工作日、大周工作日、本周类型”完成配置。
+- `ExportDataModel.java`、`TaskDataManager.kt` 支持大小周配置导入导出；旧 JSON 无新字段时仍按固定工作日导入。
+- 新增 `WorkdayScheduleResolverTest.kt` 覆盖固定模式、大小周交替、跨年和缺少锚点回退。
+- 补充 `email_config_top_bar_menu.xml` 菜单项标题，清除阻断构建的既有 `MenuTitle` Lint Error。
+- 验证：`testDebugUnitTest`、`:app:lintDebug`、`assembleDebug` 通过（JDK 17）。
 
 ### 2026-10-09 移除免费软件相关提示
 - 删除 `WatermarkDrawable.kt`、`DailyTask.kt` 及 `app/src/main/cpp/` 整个 native 模块。

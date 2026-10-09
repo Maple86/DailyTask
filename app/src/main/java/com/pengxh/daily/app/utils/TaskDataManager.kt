@@ -8,6 +8,7 @@ import com.pengxh.daily.app.model.ExportDataModel
 import com.pengxh.daily.app.sqlite.DatabaseWrapper
 import com.pengxh.daily.app.sqlite.bean.DailyTaskBean
 import com.pengxh.kt.lite.utils.SaveKeyValues
+import java.time.LocalDate
 
 class TaskDataManager() {
 
@@ -72,17 +73,34 @@ class TaskDataManager() {
             config.msgTitle?.takeIf { it.isNotBlank() } ?: "打卡结果通知"
         )
         SaveKeyValues.saveString(Constant.WX_WEB_HOOK_KEY, config.wxKey ?: "")
-        val workdays = config.customWorkdays
+        val fixedWorkdays = config.customWorkdays
+            ?.takeIf { it.isNotBlank() }
+            ?.let { CustomWorkdayManager.loadWorkdaysFromRaw(it) }
+            ?: WorkdaySchedule.DEFAULT_FIXED_WORKDAYS
+        val smallWeekWorkdays = config.smallWeekWorkdays
+            ?.takeIf { it.isNotBlank() }
+            ?.let { CustomWorkdayManager.loadWorkdaysFromRaw(it, fixedWorkdays) }
+            ?: fixedWorkdays
+        val bigWeekWorkdays = config.bigWeekWorkdays
             ?.takeIf { it.isNotBlank() }
             ?.let {
-                CustomWorkdayManager.serializeWorkdays(
-                    CustomWorkdayManager.loadWorkdaysFromRaw(it)
+                CustomWorkdayManager.loadWorkdaysFromRaw(
+                    it, WorkdaySchedule.DEFAULT_BIG_WEEK_WORKDAYS
                 )
             }
-            ?: CustomWorkdayManager.serializeWorkdays(
-                CustomWorkdayManager.getOrderedDays().take(5).toSet()
+            ?: WorkdaySchedule.DEFAULT_BIG_WEEK_WORKDAYS
+        val bigWeekAnchorMonday = config.bigWeekAnchorMonday
+            ?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        CustomWorkdayManager.saveSchedule(
+            WorkdaySchedule(
+                mode = CustomWorkdayManager.parseMode(config.workdayMode),
+                fixedWorkdays = fixedWorkdays,
+                smallWeekWorkdays = smallWeekWorkdays,
+                bigWeekWorkdays = bigWeekWorkdays,
+                bigWeekAnchorMonday = bigWeekAnchorMonday
             )
-        SaveKeyValues.saveString(Constant.CUSTOM_WORKDAYS_KEY, workdays)
+        )
 
         //
         SaveKeyValues.saveBoolean(Constant.GESTURE_DETECTOR_KEY, config.isDetectGesture)
