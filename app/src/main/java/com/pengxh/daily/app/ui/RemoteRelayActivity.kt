@@ -54,8 +54,15 @@ class RemoteRelayActivity : KotlinBaseActivity<ActivityRemoteRelayBinding>() {
             val code = binding.pairingCodeInput.text.toString().trim()
             val deviceName = binding.deviceNameInput.text.toString().trim().ifBlank { Build.MODEL }
 
-            if (endpoint.isBlank() || !endpoint.startsWith("https://")) {
-                "请填写正确的 HTTPS 中继地址".show(this)
+            if (endpoint.isBlank() ||
+                !(endpoint.startsWith("https://") || endpoint.startsWith("http://"))
+            ) {
+                "请填写正确的中继地址（http:// 或 https://）".show(this)
+                return@setOnClickListener
+            }
+            val endpointHost = runCatching { java.net.URI(endpoint).host }.getOrNull().orEmpty()
+            if (endpointHost.equals("localhost", ignoreCase = true) || endpointHost == "127.0.0.1") {
+                "localhost 指向手机自身，真机请填写电脑局域网 IP".show(this)
                 return@setOnClickListener
             }
             if (code.length != 6) {

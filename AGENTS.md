@@ -89,3 +89,9 @@
 - 重写 `README.md`，移除原作者宣传、争议说明、社区群号、授权与警示信息，仅保留功能相关内容。
 - `AGENTS.md` 新增「文档回写与变更记忆」规则与「变更记忆」小节。
 - 修正 `AGENTS.md` 中已失效的描述（移除 `app/src/main/cpp/` 与 NDK / CMake 依赖）。
+
+### 2026-10-09 远程中继地址校验放宽并拦截 localhost
+- `RemoteRelayActivity.kt` 的中继地址校验由“必须 https://”放宽为 `http://` 或 `https://`，便于本地联调 Spring Boot 后端。
+- 新增 host 校验：`localhost`、`127.0.0.1` 直接提示“指向手机自身”，避免真机误配。
+- README「远程中继」补充本地联调说明：真机必须填写电脑局域网 IP（如 `http://192.168.x.x:8080/jeecg-boot/relay`）。
+- 验证方式：`:app:compileDebugKotlin`、`:app:assembleDebug` 通过（JDK 17）。

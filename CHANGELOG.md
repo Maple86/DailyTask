@@ -44,3 +44,9 @@
 ### 代码清理
 
 - **调整配置常量格式** — 格式化 `Constant.kt` 中 `REMOTE_CLOCK_IN_CAPTURE_KEY` 常量定义
+
+## 🔧 优化 (Improvements)
+
+### 远程中继
+
+- **放宽中继地址校验并拦截 localhost** — 中继地址由仅允许 `https://` 放宽为同时接受 `http://`，方便本地联调；同时对 `localhost` / `127.0.0.1` 给出明确提示，避免真机把地址指向手机自身。
