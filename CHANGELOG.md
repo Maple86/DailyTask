@@ -16,6 +16,7 @@
 
 - **更新设置页图标控件及文案** — 目标应用图标由 `ShapeableImageView` + `RoundedStyle` 改为 `ImageFilterView` + `roundPercent`，并精简"返回截图"开关的标题与说明文案
 - **移除未使用的 `RoundedStyle` 样式** — 删除 `styles.xml` 及不再引用的圆角样式
+- **移除免费软件相关提示** — 删除仅用于生成水印文案的 native 模块及 `WatermarkDrawable`，首页与设置页不再叠加背景水印；同时移除设置入口的“使用须知”弹窗，点击设置图标直接进入设置页
 
 ### 代码清理
 
