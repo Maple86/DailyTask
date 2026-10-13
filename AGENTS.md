@@ -45,6 +45,15 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 修复云端配置长期不应用
+- 现象：小程序更新任务与工作日配置后，Android 端长时间不刷新，需反复杀进程重进才生效。
+- 根因：`RemoteRelayCoordinator.applyConfig()` 仅当 `configRevision > RemoteRelayStore.configRevision` 时才应用配置。一旦本地版本号因重装、重新配对或并发写入追平/超过后端，配置将永远不会再被应用。
+- 修复：判断条件改为「revision 变大 **或** 配置内容发生变化」，新增 `RemoteRelayStore.configHash` 记录最近应用过的配置指纹；`stableConfigHash()` 递归按键名排序规范化 JSON，避免服务端往返导致键顺序变化而反复应用。
+- 配对时记录初始快照指纹，首次同步不会重复应用一次配置。
+- 新增日志：应用配置时输出 `revision`、`revisionAdvanced`、`contentChanged`，便于定位。
+- 配套：小程序 `pages/config/config.js` 补上 `weekTypeIndex` 回填（原 `load()` 从未回填，导致大小周「本周大周」保存后回显为小周），判定规则与 `WorkdayScheduleResolver` 一致（锚点周为大周，按周差奇偶交替）。
+- 验证：`:app:compileDebugKotlin`、`testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 全部通过。
+
 ### 2026-10-13 修复远程打卡结束后不返回本应用
 - 现象：小程序【立即打卡】能打开钉钉并弹出倒计时悬浮窗，30 秒超时后悬浮窗消失，但停留在钉钉，不回到 DailyTask。
 - 根因：流程结束后的返回动作依赖 `TaskScheduler._returnToApp` 事件，而该事件只有 `MainActivity` 前台存活时才会被 `lifecycleScope` 收集；远程指令触发时 MainActivity 可能不在前台，事件被丢弃。

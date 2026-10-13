@@ -15,6 +15,7 @@ object RemoteRelayStore {
     private const val KEY_DEVICE_NAME = "device_name"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_CONFIG_REVISION = "config_revision"
+    private const val KEY_CONFIG_HASH = "config_hash"
     private const val KEY_LAST_SYNC_AT = "last_sync_at"
     private const val KEY_LAST_ERROR = "last_error"
     private const val KEY_PENDING_ATTENDANCE = "pending_attendance"
@@ -54,6 +55,16 @@ object RemoteRelayStore {
     var configRevision: Int
         get() = preferences.getInt(KEY_CONFIG_REVISION, 0)
         set(value) = preferences.edit().putInt(KEY_CONFIG_REVISION, value).apply()
+
+    /**
+     * 已应用配置的内容指纹。
+     *
+     * 仅凭 revision 判断是否需要应用配置并不可靠：一旦存储的版本号追平或超过后端，
+     * 配置将永远不会再被应用。这里额外记录内容哈希，作为 revision 之外的第二重判断。
+     */
+    var configHash: String
+        get() = loadString(KEY_CONFIG_HASH)
+        set(value) = saveString(KEY_CONFIG_HASH, value)
 
     var lastSyncAt: Long
         get() = preferences.getLong(KEY_LAST_SYNC_AT, 0L)

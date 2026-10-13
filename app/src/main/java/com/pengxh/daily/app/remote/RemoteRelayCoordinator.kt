@@ -75,6 +75,9 @@ object RemoteRelayCoordinator {
 
     suspend fun pair(endpoint: String, pairingCode: String, deviceName: String): RelayResponse {
         initializeIfNeeded()
+        // 记录初始配置内容指纹：配对时服务端已保存该快照，
+        // 这样首次同步不会因为「内容不一致」而重复应用一次。
+        val initialConfig = RemoteConfigManager.snapshot()
         val request = JsonObject().apply {
             addProperty("action", "pairDevice")
             addProperty("pairingCode", pairingCode)
@@ -82,7 +85,7 @@ object RemoteRelayCoordinator {
             addProperty("deviceModel", Build.MODEL)
             addProperty("androidVersion", Build.VERSION.SDK_INT)
             addProperty("appVersion", com.pengxh.daily.app.BuildConfig.VERSION_NAME)
-            add("initialConfig", RemoteConfigManager.snapshot())
+            add("initialConfig", initialConfig)
         }
         val response = client.call(endpoint, request)
         if (response.ok) {
@@ -93,6 +96,7 @@ object RemoteRelayCoordinator {
             RemoteRelayStore.deviceName = deviceName.ifBlank { Build.MODEL }
             RemoteRelayStore.enabled = true
             RemoteRelayStore.configRevision = 1
+            RemoteRelayStore.configHash = stableConfigHash(initialConfig)
             RemoteRelayStore.lastError = ""
         }
         return response
@@ -167,13 +171,29 @@ object RemoteRelayCoordinator {
         RemoteRelayStore.reset()
     }
 
+    /**
+     * 应用云端下发的配置。
+     *
+     * 判断条件从「revision 变大」改为「revision 变大 或 配置内容发生变化」：
+     * 仅比较 revision 时，一旦本地版本号追平或超过后端（重装、重新配对、并发写入等），
+     * 配置将永远不会再被应用，表现为小程序改了配置但手机端长期不更新。
+     */
     private suspend fun applyConfig(data: JsonObject) {
         val revision = data.get("configRevision")?.asInt ?: return
-        if (revision <= RemoteRelayStore.configRevision) return
         val config = data.getAsJsonObject("config") ?: return
+
+        val contentHash = stableConfigHash(config)
+        val revisionAdvanced = revision > RemoteRelayStore.configRevision
+        val contentChanged = contentHash != RemoteRelayStore.configHash
+        if (!revisionAdvanced && !contentChanged) return
 
         RemoteConfigManager.apply(config)
         RemoteRelayStore.configRevision = revision
+        RemoteRelayStore.configHash = contentHash
+        Log.d(
+            TAG,
+            "配置已应用 revision=$revision (revisionAdvanced=$revisionAdvanced, contentChanged=$contentChanged)"
+        )
     }
 
     private suspend fun handleCommand(
@@ -253,6 +273,35 @@ object RemoteRelayCoordinator {
             RemoteRelayStore.removeAttendance(
                 pending.mapNotNull { it.get("dedupeKey")?.asString }
             )
+        }
+    }
+
+    /**
+     * 计算配置内容的稳定哈希。
+     *
+     * 不能直接用 `JsonObject.hashCode()` / `toString()`：两者都与键顺序相关，
+     * 服务端 JSON 往返后键顺序可能变化，会把相同配置判定为「已变化」而反复应用。
+     * 这里对各字段名排序后拼接，保证同样的配置得到同样的结果。
+     */
+    private fun stableConfigHash(config: JsonObject): String = normalizeJson(config).toString()
+
+    /**
+     * 递归规范化 Json：对象按键名排序，数组保持原顺序。
+     * 这样服务端往返导致的键顺序变化不会影响指纹。
+     */
+    private fun normalizeJson(element: com.google.gson.JsonElement): com.google.gson.JsonElement {
+        return when {
+            element.isJsonObject -> JsonObject().apply {
+                element.asJsonObject.entrySet()
+                    .sortedBy { it.key }
+                    .forEach { add(it.key, normalizeJson(it.value)) }
+            }
+
+            element.isJsonArray -> JsonArray().apply {
+                element.asJsonArray.forEach { add(normalizeJson(it)) }
+            }
+
+            else -> element
         }
     }
 
