@@ -33,7 +33,6 @@ object DeviceStatusCollector {
             addProperty("taskRunning", TaskScheduler.isRunning())
             addProperty("notificationListenerAlive", context.notificationEnable())
             addProperty("projectionAlive", ProjectionSession.isStateActive())
-            addProperty("appliedConfigRevision", RemoteRelayStore.configRevision)
         }
     }
 }

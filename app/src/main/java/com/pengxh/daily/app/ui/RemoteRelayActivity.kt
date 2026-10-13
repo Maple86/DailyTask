@@ -154,7 +154,6 @@ class RemoteRelayActivity : KotlinBaseActivity<ActivityRemoteRelayBinding>() {
         val status = buildString {
             appendLine("状态：${if (paired) "已配对" else "未配对"}")
             appendLine("设备 ID：${RemoteRelayStore.deviceId.ifBlank { "无" }}")
-            appendLine("配置版本：${RemoteRelayStore.configRevision}")
             appendLine("最后同步：$syncTime")
             if (RemoteRelayStore.lastError.isNotBlank()) {
                 append("最后错误：${RemoteRelayStore.lastError}")

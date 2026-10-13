@@ -45,6 +45,13 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 移除云端配置同步，仅保留远程快捷操作
+- 产品决策：小程序不再管理任务时间与工作日配置，任务/工作日/目标应用等全部由 Android 端本地设置管理，云端只下发快捷操作指令。
+- Android 移除：删除 `RemoteConfigManager`；`RemoteRelayCoordinator` 不再处理配置下发（移除 `applyConfig`、`stableConfigHash`、`normalizeJson`、`configHash`、配对时的 `initialConfig`）；`RemoteRelayStore` 删除 `configRevision` / `configHash`；`DeviceStatusCollector` 不再上报 `appliedConfigRevision`；`RemoteRelayActivity` 不再展示配置版本。
+- Android 新增：`RemoteCommandProcessor` 支持 `TOGGLE_LOOP` 指令，切换本地 `TASK_AUTO_RECYCLE_KEY` 并回传结果与消息通知，取代原先通过写云配置实现的循环开关。
+- 保持：`START_TASK` / `STOP_TASK` / `TRIGGER_CLOCK_IN` / `QUERY_STATUS` 行为不变；打卡记录与 `records` 页面保留。
+- 验证：`:app:compileDebugKotlin`、`testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 全部通过。
+
 ### 2026-10-13 修复远程同步线程崩溃（JsonNull 类型转换）
 - 现象：安装新版本后打开 App 立即闪退；真机 logcat 显示 `FATAL EXCEPTION: DefaultDispatcher-worker-1`。
 - 根因：服务端在「配置无变化」时返回 `"config": null`（Gson 解析为 `JsonNull`），而 `RemoteRelayCoordinator.applyConfig()` 直接调用 `data.getAsJsonObject("config")`。Gson 该方法对 `JsonNull` 会抛 `ClassCastException`（而非返回 null），异常在 `Dispatchers.IO` 的同步协程中未被捕获，直接杀死进程。

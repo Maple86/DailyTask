@@ -18,6 +18,12 @@ data class CommandResult(
     val retry: Boolean = false
 )
 
+/**
+ * 远程指令执行器。
+ *
+ * 只处理快捷操作类指令，不再处理任何云端配置下发。
+ * 任务时间、工作日、目标应用等仍由 Android 端本地设置管理。
+ */
 object RemoteCommandProcessor {
     suspend fun execute(context: Context, command: JsonObject): CommandResult {
         val type = command.get("type")?.asString.orEmpty()
@@ -41,6 +47,8 @@ object RemoteCommandProcessor {
                     CommandResult("SUCCEEDED", "任务已停止")
                 }
             }
+
+            "TOGGLE_LOOP" -> toggleLoop()
 
             "TRIGGER_CLOCK_IN" -> executeClockIn(context)
 
@@ -66,6 +74,18 @@ object RemoteCommandProcessor {
             Intent(app, ForegroundRunningService::class.java)
         )
         return CommandResult("RETRY", "正在启动任务服务，稍后重试", retry = true)
+    }
+
+    /**
+     * 循环开关：切换「任务每日自动循环」本地配置。
+     * 该配置由 Android 端本地持有，云端只负责下发一次切换指令。
+     */
+    private suspend fun toggleLoop(): CommandResult {
+        val enabled = !SaveKeyValues.loadBoolean(Constant.TASK_AUTO_RECYCLE_KEY, true)
+        SaveKeyValues.saveBoolean(Constant.TASK_AUTO_RECYCLE_KEY, enabled)
+        val label = if (enabled) "已开启" else "已关闭"
+        MessageDispatcher.sendMessage("循环任务状态通知", "循环任务状态已更新为：$label")
+        return CommandResult("SUCCEEDED", "循环任务状态已更新为：$label")
     }
 
     /**
