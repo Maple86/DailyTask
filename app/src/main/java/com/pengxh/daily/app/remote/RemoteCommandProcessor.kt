@@ -7,10 +7,17 @@ import com.google.gson.JsonObject
 import com.pengxh.daily.app.DailyTaskApplication
 import com.pengxh.daily.app.extensions.isApplicationExist
 import com.pengxh.daily.app.service.ForegroundRunningService
+import com.pengxh.daily.app.service.NotificationMonitorService
+import com.pengxh.daily.app.sqlite.DatabaseWrapper
+import com.pengxh.daily.app.ui.MainActivity
 import com.pengxh.daily.app.utils.Constant
 import com.pengxh.daily.app.utils.MessageDispatcher
+import com.pengxh.daily.app.utils.MonitorEvent
+import com.pengxh.daily.app.utils.ProjectionSession
 import com.pengxh.daily.app.utils.TaskScheduler
 import com.pengxh.kt.lite.utils.SaveKeyValues
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 data class CommandResult(
     val status: String,
@@ -52,6 +59,22 @@ object RemoteCommandProcessor {
 
             "TRIGGER_CLOCK_IN" -> executeClockIn(context)
 
+            // ===== 复刻原有 DT# 聊天指令的快捷操作 =====
+
+            "SHOW_MASK" -> emitUiCommand(
+                MonitorEvent.RemoteShowMask,
+                "息屏指令已下发，设备将在下次同步时执行"
+            )
+
+            "HIDE_MASK" -> emitUiCommand(
+                MonitorEvent.RemoteHideMask,
+                "亮屏指令已下发，设备将在下次同步时执行"
+            )
+
+            "SCREENSHOT" -> executeScreenshot(context)
+
+            "ATTENDANCE_REPORT" -> buildAttendanceReport()
+
             "QUERY_STATUS" -> CommandResult(
                 "SUCCEEDED",
                 if (TaskScheduler.isRunning()) "任务运行中" else "任务未运行"
@@ -86,6 +109,55 @@ object RemoteCommandProcessor {
         val label = if (enabled) "已开启" else "已关闭"
         MessageDispatcher.sendMessage("循环任务状态通知", "循环任务状态已更新为：$label")
         return CommandResult("SUCCEEDED", "循环任务状态已更新为：$label")
+    }
+
+    /**
+     * 息屏 / 亮屏：需要 MainActivity 持有窗口，通过 monitor 事件交由 UI 层执行。
+     */
+    private fun emitUiCommand(event: MonitorEvent, message: String): CommandResult {
+        if (!MainActivity.isInForeground) {
+            return CommandResult("FAILED", "应用不在前台，无法执行该操作，请先打开 DailyTask")
+        }
+        NotificationMonitorService.emitMonitorEvent(event)
+        return CommandResult("SUCCEEDED", message)
+    }
+
+    /**
+     * 截屏：与聊天指令 DT#截屏 一致。
+     * 先确认投屏服务可用，再交由 UI 层打开目标应用、倒计时后截图并回传。
+     */
+    private fun executeScreenshot(context: Context): CommandResult {
+        if (!ProjectionSession.isStateActive()) {
+            MessageDispatcher.sendMessage("截屏状态通知", "截屏服务已断开，截屏失败")
+            return CommandResult("FAILED", "截屏服务已断开，请先在设备上开启截屏权限")
+        }
+        if (!context.isApplicationExist(Constant.getTargetApp())) {
+            return CommandResult("FAILED", "目标应用未安装，无法执行截屏")
+        }
+        return emitUiCommand(
+            MonitorEvent.RemoteScreenshot,
+            "截屏指令已下发，将打开目标应用并在倒计时后截图"
+        )
+    }
+
+    /**
+     * 考勤记录：与聊天指令 DT#考勤记录 一致。
+     * 读取当天通知记录中「考勤打卡」相关的条目，并通过消息渠道发送。
+     */
+    private suspend fun buildAttendanceReport(): CommandResult {
+        val notices = withContext(Dispatchers.IO) {
+            runCatching { DatabaseWrapper.loadCurrentDayNotice() }.getOrDefault(emptyList())
+        }
+        val record = buildString {
+            var index = 1
+            notices.filter { it.noticeMessage.contains("考勤打卡") }.forEach {
+                append("【第${index}次】${it.noticeMessage}，时间：${it.postTime}\r\n")
+                index++
+            }
+        }
+        val content = record.ifBlank { "当天暂无考勤打卡记录" }
+        MessageDispatcher.sendMessage("当天考勤记录通知", content)
+        return CommandResult("SUCCEEDED", content.trim())
     }
 
     /**

@@ -45,6 +45,16 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 远程快捷操作复刻聊天指令（息屏/亮屏/考勤记录/截屏）
+- 需求：小程序快捷操作复刻原有 `DT#` 聊天指令能力，新增【息屏】【考勤记录】【截屏】（同时补上反向的【亮屏】）。
+- 新增指令：`SHOW_MASK`（息屏）、`HIDE_MASK`（亮屏）、`SCREENSHOT`（截屏）、`ATTENDANCE_REPORT`（考勤记录）。
+- `MonitorEvent` 新增 `RemoteShowMask` / `RemoteHideMask` / `RemoteScreenshot`，由 `MainActivity` 复用既有 `maskViewController` 与 `captureTargetAppAndReturn()` 执行，与聊天指令行为一致。
+- `MainActivity` 新增 `isInForeground` 前台标记（`onResume` 置真、`onPause`/`onDestroy` 置假），`RemoteCommandProcessor` 借此判断息屏/亮屏/截屏能否执行，避免「事件无人接收却上报成功」。
+- `ATTENDANCE_REPORT` 完全在 Android 端完成：读取本地当天通知记录中「考勤打卡」条目，格式化后经消息渠道发送，返回内容同时写入指令 `resultMessage`。
+- `SCREENSHOT` 先校验投屏服务与目标应用，再交由 UI 层打开目标应用、倒计时 10 秒截图并回传附件；行为与 `DT#截屏` 相同。
+- 注意：息屏 / 亮屏 / 截屏依赖 `MainActivity` 在前台，应用不在前台时返回失败并提示先打开 DailyTask。
+- 验证：`:app:compileDebugKotlin`、`testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 全部通过。
+
 ### 2026-10-13 移除云端配置同步，仅保留远程快捷操作
 - 产品决策：小程序不再管理任务时间与工作日配置，任务/工作日/目标应用等全部由 Android 端本地设置管理，云端只下发快捷操作指令。
 - Android 移除：删除 `RemoteConfigManager`；`RemoteRelayCoordinator` 不再处理配置下发（移除 `applyConfig`、`stableConfigHash`、`normalizeJson`、`configHash`、配对时的 `initialConfig`）；`RemoteRelayStore` 删除 `configRevision` / `configHash`；`DeviceStatusCollector` 不再上报 `appliedConfigRevision`；`RemoteRelayActivity` 不再展示配置版本。

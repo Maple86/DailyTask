@@ -62,6 +62,18 @@ import java.util.Locale
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
+    companion object {
+        /**
+         * MainActivity 是否处于前台。
+         *
+         * 息屏 / 亮屏 / 截屏等指令依赖窗口，只有 Activity 可交互时才能执行。
+         * 远程指令据此判断能否下发 UI 指令，避免误报执行成功。
+         */
+        @Volatile
+        var isInForeground: Boolean = false
+            private set
+    }
+
     private val kTag = "MainActivity"
     private val context by lazy { this }
     private val dateTimeFormat by lazy {
@@ -297,8 +309,14 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        isInForeground = false
+    }
+
     override fun onResume() {
         super.onResume()
+        isInForeground = true
         if (!Settings.canDrawOverlays(this)) {
             "悬浮窗权限未开启，部分功能可能无法正常使用".show(this)
         }
@@ -325,6 +343,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     override fun onDestroy() {
         super.onDestroy()
+        isInForeground = false
         mainHandler.removeCallbacksAndMessages(null)
         maskViewController.destroy()
     }
@@ -364,6 +383,27 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             }
 
             is MonitorEvent.AppOpenedForScreenshot -> {
+                captureTargetAppAndReturn(
+                    countdownSeconds = 10,
+                    messageTitle = "截屏状态通知",
+                    successMessage = "截图完成",
+                    failureMessage = "截图完成，但是无法获取截图"
+                )
+            }
+
+            is MonitorEvent.RemoteShowMask -> {
+                if (!maskViewController.isMaskVisible()) {
+                    maskViewController.showMaskView()
+                }
+            }
+
+            is MonitorEvent.RemoteHideMask -> {
+                if (maskViewController.isMaskVisible()) {
+                    maskViewController.hideMaskView()
+                }
+            }
+
+            is MonitorEvent.RemoteScreenshot -> {
                 captureTargetAppAndReturn(
                     countdownSeconds = 10,
                     messageTitle = "截屏状态通知",

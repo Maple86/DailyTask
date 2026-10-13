@@ -36,6 +36,21 @@ sealed class MonitorEvent {
     data object AppOpenedForScreenshot : MonitorEvent()
 
     /**
+     * 远程"息屏"指令（小程序快捷操作入口）
+     */
+    data object RemoteShowMask : MonitorEvent()
+
+    /**
+     * 远程"亮屏"指令（小程序快捷操作入口）
+     */
+    data object RemoteHideMask : MonitorEvent()
+
+    /**
+     * 远程"截屏"指令（小程序快捷操作入口）
+     */
+    data object RemoteScreenshot : MonitorEvent()
+
+    /**
      * 目标应用已为远程"打卡"指令打开
      * */
     data class AppOpenedForRemoteClockIn(
