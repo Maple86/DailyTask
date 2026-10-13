@@ -26,7 +26,7 @@ object RemoteCommandProcessor {
                 if (TaskScheduler.isRunning()) {
                     CommandResult("SUCCEEDED", "任务已在运行中")
                 } else {
-                    TaskScheduler.startTask()
+                    TaskScheduler.startTask(force = true)
                     MessageDispatcher.sendMessage("启动任务通知", "任务已启动，将按计划时间执行")
                     CommandResult("SUCCEEDED", "任务已启动")
                 }

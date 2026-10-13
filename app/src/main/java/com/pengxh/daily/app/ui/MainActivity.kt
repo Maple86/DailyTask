@@ -291,7 +291,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                         "循环任务启动失败，请先添加任务时间点".show(context)
                         return@launch
                     }
-                    TaskScheduler.startTask()
+                    TaskScheduler.startTask(force = true)
                 }
             }
         }
@@ -345,7 +345,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
             is MonitorEvent.StartTaskCommand -> {
                 if (!TaskScheduler.isRunning()) {
-                    TaskScheduler.startTask()
+                        TaskScheduler.startTask(force = true)
                 }
             }
 

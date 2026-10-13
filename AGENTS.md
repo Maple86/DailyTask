@@ -45,6 +45,14 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 修复手动启动任务显示「今日任务已全部执行完毕」
+- 现象：设置 18:00 / 19:00 任务后手动开启，立即显示「今日任务已全部执行完毕」，任务不执行。
+- 根因：`TaskScheduler.lastProcessedDate` 为进程内字段，一旦当天被标记为「已处理」（例如 `checkMissedReset` 自动启动过一次），后续手动启动会直接进入「今日已处理，等待下一次重置」分支，仅显示完成提示而不重新执行排程。休息日判定（`shouldSkipToday()`）同样会一次性标记当天已处理。
+- 修复：`startTask(force: Boolean = false)` 新增 `force` 参数，手动启动路径传 `true`，会取消旧调度协程、清除 `lastProcessedDate`、并跳过休息日判定，强制重新构建并执行当天排程。
+- 调用点：首页启动按钮（`MainActivity` L294）、聊天指令「DT#执行任务」（L348）、小程序远程 `START_TASK`（`RemoteCommandProcessor`）改用 `force = true`；自动路径（`ForegroundRunningService` 每日重置、`checkMissedReset`）保持 `force = false`。
+- 诊断增强：`startTask` 记录是否强制重启；休息日跳过时记录 `dayFlag`；排程构建时记录每个任务的「计划时间/实际时间」，便于用 `app_runtime_log.txt` 定位。
+- 验证：JDK 17 下 `:app:compileDebugKotlin`、`testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 全部通过。
+
 ### 2026-10-13 代码审查修复：打卡信号并发与取消安全
 - 审查发现上一提交存在的缺陷并全部修复。
 - **打卡信号并发覆盖**：`TaskScheduler` 原用对象级 `clockInDeferred` 承载等待，定时任务与远程打卡并发时会互相覆盖导致信号丢失。改为 `Channel<Unit>(Channel.CONFLATED)`，`waitForClockIn` 用 `clockInSignal.onReceive` 参与 `select`，`notifyClockIn()` 改 `trySend`。

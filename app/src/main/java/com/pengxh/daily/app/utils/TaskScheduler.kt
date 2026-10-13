@@ -86,8 +86,10 @@ object TaskScheduler {
     /**
      * 启动每日任务调度
      * 时序：防重复 → 检查协程作用域 → 判断周末/节假日 → 构建排程 → 启动核心循环
+     *
+     * @param force 手动启动时为 true：清除「今日已处理」标记并忽略休息日判定，允许重新执行当天排程
      */
-    fun startTask() {
+    fun startTask(force: Boolean = false) {
         if (_isRunning.value) {
             LogFileManager.writeLog("任务已在执行中，忽略重复启动")
             return
@@ -97,6 +99,14 @@ object TaskScheduler {
         if (currentScope == null) {
             LogFileManager.writeLog("TaskScheduler scope 未初始化")
             return
+        }
+
+        if (force) {
+            // 强制重启前先取消旧调度协程，避免出现两个调度器同时运行
+            job?.cancel()
+            job = null
+            lastProcessedDate = null
+            LogFileManager.writeLog("手动启动：清除今日已处理标记，忽略休息日判定，强制重新执行排程")
         }
 
         _isRunning.value = true
@@ -112,7 +122,10 @@ object TaskScheduler {
                     continue
                 }
 
-                if (shouldSkipToday()) {
+                if (!force && shouldSkipToday()) {
+                    LogFileManager.writeLog(
+                        "今日判定为休息日，跳过任务（dayFlag=${getDayFlag()}）"
+                    )
                     _tipsEvent.emit(TipsEvent.Skip)
                     ForegroundRunningService.emitNotificationText("今日休息，任务已跳过")
                 } else {
@@ -122,7 +135,12 @@ object TaskScheduler {
                         return@launch
                     }
 
-                    LogFileManager.writeLog("开始执行每日任务，共 ${schedule.size} 个")
+                    LogFileManager.writeLog(
+                        "开始执行每日任务，共 ${schedule.size} 个：" +
+                                schedule.joinToString("，") {
+                                    "计划=${it.plannedTime}/实际=${it.actualTime}"
+                                }
+                    )
                     executeSchedule(schedule)
                 }
 
