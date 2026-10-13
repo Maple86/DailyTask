@@ -62,20 +62,20 @@ class RemoteRelayClient {
                     )
                 }
 
-                val ok = root.get("ok")?.asBoolean ?: response.isSuccessful
+                val ok = root.booleanOrNull("ok") ?: response.isSuccessful
                 if (!ok) {
-                    val error = root.getAsJsonObject("error")
+                    val error = root.objectOrNull("error")
                     return@withContext RelayResponse(
                         false,
                         null,
-                        error?.get("code")?.asString ?: "REQUEST_FAILED",
-                        error?.get("message")?.asString ?: "请求失败，HTTP ${response.code}"
+                        error?.stringOrEmpty("code")?.ifBlank { "REQUEST_FAILED" } ?: "REQUEST_FAILED",
+                        error?.stringOrEmpty("message")?.ifBlank { "请求失败，HTTP ${response.code}" } ?: "请求失败，HTTP ${response.code}"
                     )
                 }
 
                 RelayResponse(
                     true,
-                    root.getAsJsonObject("data") ?: JsonObject(),
+                    root.objectOrNull("data") ?: JsonObject(),
                     "",
                     ""
                 )

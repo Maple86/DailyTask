@@ -57,7 +57,10 @@ object RemoteRelayCoordinator {
 
         loopJob = scope.launch(Dispatchers.IO) {
             while (isActive && RemoteRelayStore.enabled) {
-                syncOnce()
+                // 单次同步失败不能中断整个轮询循环，更不能让异常冒泡杀死进程
+                runCatching { syncOnce() }.onFailure {
+                    Log.e(TAG, "轮询同步异常，已忽略并等待下一轮", it)
+                }
                 delay(POLL_INTERVAL_SECONDS * 1000L)
             }
         }
@@ -70,7 +73,11 @@ object RemoteRelayCoordinator {
 
     fun syncNow() {
         if (!shouldSync()) return
-        internalScope.launch { syncOnce() }
+        internalScope.launch {
+            runCatching { syncOnce() }.onFailure {
+                Log.e(TAG, "手动同步异常", it)
+            }
+        }
     }
 
     suspend fun pair(endpoint: String, pairingCode: String, deviceName: String): RelayResponse {
@@ -130,7 +137,7 @@ object RemoteRelayCoordinator {
 
             RemoteRelayStore.lastSyncAt = System.currentTimeMillis()
             RemoteRelayStore.lastError = ""
-            data.getAsJsonArray("commands") ?: JsonArray()
+            data.arrayOrNull("commands") ?: JsonArray()
         } ?: return false
 
         dispatchCommands(commands)
@@ -150,6 +157,8 @@ object RemoteRelayCoordinator {
             internalScope.launch {
                 try {
                     handleCommand(context, command, commandId)
+                } catch (e: Throwable) {
+                    Log.e(TAG, "执行指令 $commandId 异常", e)
                 } finally {
                     inFlightCommands.remove(commandId)
                 }
@@ -180,7 +189,11 @@ object RemoteRelayCoordinator {
      */
     private suspend fun applyConfig(data: JsonObject) {
         val revision = data.get("configRevision")?.asInt ?: return
-        val config = data.getAsJsonObject("config") ?: return
+        // 后端在「配置无变化」时会返回 "config": null（JsonNull），
+        // 直接调用 getAsJsonObject() 会抛 ClassCastException，必须显式判断类型。
+        val configElement = data.get("config")
+        if (configElement == null || !configElement.isJsonObject) return
+        val config = configElement.asJsonObject
 
         val contentHash = stableConfigHash(config)
         val revisionAdvanced = revision > RemoteRelayStore.configRevision

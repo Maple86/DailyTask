@@ -45,6 +45,14 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 修复远程同步线程崩溃（JsonNull 类型转换）
+- 现象：安装新版本后打开 App 立即闪退；真机 logcat 显示 `FATAL EXCEPTION: DefaultDispatcher-worker-1`。
+- 根因：服务端在「配置无变化」时返回 `"config": null`（Gson 解析为 `JsonNull`），而 `RemoteRelayCoordinator.applyConfig()` 直接调用 `data.getAsJsonObject("config")`。Gson 该方法对 `JsonNull` 会抛 `ClassCastException`（而非返回 null），异常在 `Dispatchers.IO` 的同步协程中未被捕获，直接杀死进程。
+- 修复：新增 `JsonExtensions.kt` 提供 `objectOrNull` / `arrayOrNull` / `stringOrEmpty` / `intOrZero` / `booleanOrNull`，统一做 Json 类型判断；`applyConfig` 改为先判断 `isJsonObject`；`RemoteRelayClient` 的 `ok` / `error` / `data` 一并改用安全取值。
+- 加固：轮询循环、`syncNow()`、指令执行协程全部包 `runCatching` 并记录日志，避免任何单次异常终止后台同步或杀死进程。
+- 新增回归测试 `JsonExtensionsTest`：固化「Gson 原生取值遇 null 抛异常」与「安全取值返回 null」两种行为，覆盖 config / commands / data / ok 四类字段。
+- 验证：真机（OPPO PADM00，Android 目标 SDK 36）安装后启动稳定运行 90 秒无崩溃、无 JsonNull 异常；`testDebugUnitTest`（含新测试）、`:app:lintDebug`、`:app:assembleDebug` 全部通过。
+
 ### 2026-10-13 修复云端配置长期不应用
 - 现象：小程序更新任务与工作日配置后，Android 端长时间不刷新，需反复杀进程重进才生效。
 - 根因：`RemoteRelayCoordinator.applyConfig()` 仅当 `configRevision > RemoteRelayStore.configRevision` 时才应用配置。一旦本地版本号因重装、重新配对或并发写入追平/超过后端，配置将永远不会再被应用。
