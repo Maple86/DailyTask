@@ -1,5 +1,6 @@
 package com.pengxh.daily.app.utils
 
+import android.content.Intent
 import android.os.SystemClock
 import com.pengxh.daily.app.DailyTaskApplication
 import com.pengxh.daily.app.extensions.formatTime
@@ -7,6 +8,7 @@ import com.pengxh.daily.app.extensions.openApplication
 import com.pengxh.daily.app.extensions.resolveExecutionTime
 import com.pengxh.daily.app.service.CaptureImageService
 import com.pengxh.daily.app.service.ForegroundRunningService
+import com.pengxh.daily.app.ui.MainActivity
 import com.pengxh.daily.app.sqlite.DatabaseWrapper
 import com.pengxh.daily.app.sqlite.bean.DailyTaskBean
 import com.pengxh.kt.lite.utils.SaveKeyValues
@@ -344,6 +346,32 @@ object TaskScheduler {
             // 无论正常结束还是被取消，都清理倒计时任务与残留信号
             timeoutJob.cancel()
             clockInSignal.tryReceive()
+            // 打卡流程结束后回到本应用，远程触发与定时任务保持一致
+            returnToDailyTask()
+        }
+    }
+
+    /**
+     * 打卡流程结束后把本应用切到前台。
+     *
+     * 原先该动作依赖 `_returnToApp` 事件，而它只有 MainActivity 在前台时才会被收集；
+     * 远程指令触发打卡时 MainActivity 可能不在前台，事件会被丢弃，导致停留在目标应用。
+     * 这里改为直接从应用上下文拉起 MainActivity，使远程触发与定时任务行为一致。
+     */
+    private fun returnToDailyTask() {
+        runCatching {
+            val app = DailyTaskApplication.get()
+            val intent = Intent(app, MainActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
+            }
+            app.startActivity(intent)
+            LogFileManager.writeLog("打卡流程结束，已切回本应用")
+        }.onFailure {
+            LogFileManager.writeLog("回到本应用失败：${it.message ?: "未知错误"}")
         }
     }
 

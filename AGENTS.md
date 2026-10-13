@@ -45,6 +45,14 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 修复远程打卡结束后不返回本应用
+- 现象：小程序【立即打卡】能打开钉钉并弹出倒计时悬浮窗，30 秒超时后悬浮窗消失，但停留在钉钉，不回到 DailyTask。
+- 根因：流程结束后的返回动作依赖 `TaskScheduler._returnToApp` 事件，而该事件只有 `MainActivity` 前台存活时才会被 `lifecycleScope` 收集；远程指令触发时 MainActivity 可能不在前台，事件被丢弃。
+- 修复：`waitForClockIn()` 的 `finally` 中新增 `returnToDailyTask()`，直接从应用上下文以 `FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_REORDER_TO_FRONT or FLAG_ACTIVITY_SINGLE_TOP` 拉起 `MainActivity`，不依赖 MainActivity 存活。
+- 该修复同时作用于定时任务与远程指令两条路径，保证「打开目标应用 → 等待打卡或超时 → 返回本应用」流程完全一致。
+- 新增日志：切换成功记录「打卡流程结束，已切回本应用」，失败记录具体异常信息。
+- 验证：JDK 17 下 `:app:compileDebugKotlin`、`testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 全部通过。
+
 ### 2026-10-13 修复手动启动任务显示「今日任务已全部执行完毕」
 - 现象：设置 18:00 / 19:00 任务后手动开启，立即显示「今日任务已全部执行完毕」，任务不执行。
 - 根因：`TaskScheduler.lastProcessedDate` 为进程内字段，一旦当天被标记为「已处理」（例如 `checkMissedReset` 自动启动过一次），后续手动启动会直接进入「今日已处理，等待下一次重置」分支，仅显示完成提示而不重新执行排程。休息日判定（`shouldSkipToday()`）同样会一次性标记当天已处理。
