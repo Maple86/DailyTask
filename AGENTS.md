@@ -45,6 +45,16 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 修复旧机型远程指令拉取与远程打卡流程
+- 问题：OPPO A3（ColorOS）会把前台服务杀掉，导致 `RemoteRelayCoordinator` 的 60 秒轮询停止；只剩 WorkManager 15 分钟周期任务，实际可能几十分钟才拉取一次指令，小程序端指令长期停留在 `PENDING`。
+- 新增 `RelaySyncAlarmReceiver` + `RemoteSyncScheduler` 的 `AlarmManager` 兜底（每 15 分钟，`setExactAndAllowWhileIdle`，无精确闹钟权限时回退 `setAndAllowWhileIdle`），唤醒后串起下一次闹钟并入队一次性 Worker。Manifest 新增 `USE_EXACT_ALARM` 权限与接收器声明；配对成功时注册、解绑时取消。
+- `TaskScheduler` 抽出 `waitForClockIn(timeoutSeconds, captureOnTimeout)`，定时任务与远程「立即打卡」共用「打开目标应用 → 等待打卡通知或超时」流程；定时任务保留兜底截屏，远程指令不触发截屏。
+- `RemoteCommandProcessor` 的 `TRIGGER_CLOCK_IN` 不再「打开应用即返回成功」，改为等待真实结果；`START_TASK` / `STOP_TASK` 补齐 `MessageDispatcher` 通知，与 `DT#` 聊天指令一致；`QUERY_STATUS` 返回真实运行状态。
+- 打卡成功信号改由 `NotificationMonitorService` 直接调用 `TaskScheduler.notifyClockIn()`，不再依赖 `MainActivity` 存活；`MainActivity` 仅负责界面返回。
+- `RemoteRelayCoordinator` 将指令执行移出同步互斥锁并加入 `inFlightCommands` 去重，避免远程打卡等待期间阻塞后续轮询；ACK 失败时暂存结果下次补发，不重复执行指令；兼容后端返回的 `id` 与 `commandId` 字段。
+- 小程序 `device.wxml` 展示指令 `resultMessage`，可看到「打卡成功」或超时原因。
+- 验证：JDK 17 下 `:app:compileDebugKotlin`、`testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 全部通过；旧机型真实拉取、远程打卡与通知行为需真机回归。
+
 ### 2026-10-09 修复远程配对主线程数据库异常
 - `RemoteConfigManager.snapshot()` 在配对阶段读取 Room 任务表时触发 `Cannot access database on the main thread`，导致首次配对失败。
 - 任务快照和任务替换现在显式切换到 `Dispatchers.IO` 执行，配对请求构造不再阻塞主线程。

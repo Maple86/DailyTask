@@ -11,6 +11,7 @@ import com.pengxh.daily.app.R
 import com.pengxh.daily.app.databinding.ActivityRemoteRelayBinding
 import com.pengxh.daily.app.remote.RemoteRelayCoordinator
 import com.pengxh.daily.app.remote.RemoteRelayStore
+import com.pengxh.daily.app.remote.RemoteSyncScheduler
 import com.pengxh.daily.app.service.ForegroundRunningService
 import com.pengxh.kt.lite.base.KotlinBaseActivity
 import com.pengxh.kt.lite.extensions.show
@@ -84,6 +85,7 @@ class RemoteRelayActivity : KotlinBaseActivity<ActivityRemoteRelayBinding>() {
                             Intent(this@RemoteRelayActivity, ForegroundRunningService::class.java)
                         )
                         RemoteRelayCoordinator.syncNow()
+                        RemoteSyncScheduler.schedule(this@RemoteRelayActivity)
                         "配对成功".show(this@RemoteRelayActivity)
                     } else {
                         "配对失败：${response.errorMessage}".show(this@RemoteRelayActivity)

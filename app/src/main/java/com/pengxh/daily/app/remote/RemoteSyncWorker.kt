@@ -10,7 +10,7 @@ class RemoteSyncWorker(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         RemoteRelayCoordinator.initialize(applicationContext)
-        if (!RemoteRelayStore.enabled || !RemoteRelayStore.isConfigured()) {
+        if (!RemoteRelayCoordinator.shouldSync()) {
             return Result.success()
         }
         return if (RemoteRelayCoordinator.syncOnce()) {

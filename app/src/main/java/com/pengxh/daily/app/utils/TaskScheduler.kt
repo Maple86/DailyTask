@@ -196,62 +196,14 @@ object TaskScheduler {
             val timeoutSeconds = SaveKeyValues.loadInt(
                 Constant.STAY_OVERTIME_KEY, Constant.DEFAULT_OVER_TIME
             )
-
-            DailyTaskApplication.get().openApplication()
-
-            // Kotlin语法糖——竞态保护：select 只取先完成的分支，另一个自动取消
-            var hasCaptured = false
-            var captureDeferred: CompletableDeferred<String?>? = null
-            val timeoutJob = launch {
-                updateCountdownWithNotification(timeoutSeconds * 1000L) { remaining ->
-                    val tick = (remaining / 1000).toInt()
-                    FloatingWindowController.updateTime(tick)
-
-                    // 最后 5 秒兜底截屏（只触发一次）
-                    if (tick <= 5 && !hasCaptured) {
-                        val resultSource = SaveKeyValues.loadInt(
-                            Constant.RESULT_SOURCE_KEY, Constant.DEFAULT_INDEX
-                        )
-                        if (resultSource == 1) {
-                            hasCaptured = true
-                            captureDeferred = CaptureImageService.requestCaptureScreen()
-                        }
-                    }
-                }
-            }
-
-            val clockInSuccess = select {
-                // 分支 A：超时
-                timeoutJob.onJoin { false }
-
-                // 分支 B：打卡成功
-                CompletableDeferred<Unit>().also { clockInDeferred = it }.onAwait { true }
-            }
-
-            timeoutJob.cancel()
-            clockInDeferred = null
+            val clockInSuccess = waitForClockIn(timeoutSeconds, captureOnTimeout = true)
 
             // 超时路径——打卡失败，回到主页 + 兜底通知 + 继续下一个任务
             if (!clockInSuccess) {
                 _returnToApp.emit(Unit)
-
-                // 发送兜底截图给用户
-                if (hasCaptured) {
-                    // Deferred 内部已有 3s 超时兜底，await() 不会无限挂起
-                    val imagePath = captureDeferred?.await() ?: ""
-                    if (imagePath.isNotEmpty()) {
-                        MessageDispatcher.sendAttachmentMessage(
-                            "任务执行结果通知", "任务执行结果见附件", imagePath
-                        )
-                    } else {
-                        MessageDispatcher.sendMessage("任务执行结果通知", "截屏失败，imagePath 为空")
-                    }
-                } else {
-                    // 通知模式：无截图，纯文本提醒
-                    MessageDispatcher.sendMessage(
-                        "任务执行结果通知", "任务超时，请手动检查是否打卡成功"
-                    )
-                }
+                MessageDispatcher.sendMessage(
+                    "任务执行结果通知", "任务超时，请手动检查是否打卡成功"
+                )
             }
 
             // ====== 阶段 3：回到主界面，处理结果 ======
@@ -297,16 +249,76 @@ object TaskScheduler {
     }
 
     /**
+     * 打开目标应用并等待打卡结果。
+     *
+     * 定时任务与小程序的远程「立即打卡」共用此流程：
+     *   1. 打开目标 App
+     *   2. 等待打卡成功通知，或等待超时
+     *   3. 返回是否在超时前收到成功信号
+     *
+     * @param timeoutSeconds 等待超时时间（秒）
+     * @param captureOnTimeout 超时前是否触发兜底截屏（定时任务需要；远程指令不需要）
+     */
+    suspend fun waitForClockIn(
+        timeoutSeconds: Int,
+        captureOnTimeout: Boolean = false
+    ): Boolean {
+        DailyTaskApplication.get().openApplication()
+
+        val localDeferred = CompletableDeferred<Unit>()
+        clockInDeferred = localDeferred
+
+        var hasCaptured = false
+        var captureDeferred: CompletableDeferred<String?>? = null
+
+        val timeoutJob = CoroutineScope(Dispatchers.IO).launch {
+            updateCountdownWithNotification(timeoutSeconds * 1000L) { remaining ->
+                val tick = (remaining / 1000).toInt()
+                FloatingWindowController.updateTime(tick)
+
+                if (captureOnTimeout && tick <= 5 && !hasCaptured) {
+                    val resultSource = SaveKeyValues.loadInt(
+                        Constant.RESULT_SOURCE_KEY, Constant.DEFAULT_INDEX
+                    )
+                    if (resultSource == 1) {
+                        hasCaptured = true
+                        captureDeferred = CaptureImageService.requestCaptureScreen()
+                    }
+                }
+            }
+        }
+
+        val success = select {
+            timeoutJob.onJoin { false }
+            localDeferred.onAwait { true }
+        }
+
+        timeoutJob.cancel()
+        clockInDeferred = null
+
+        if (!success && hasCaptured) {
+            val imagePath = withContext(Dispatchers.IO) {
+                runCatching { captureDeferred?.await() }.getOrNull() ?: ""
+            }
+            if (imagePath.isNotEmpty()) {
+                MessageDispatcher.sendAttachmentMessage(
+                    "任务执行结果通知", "任务执行结果见附件", imagePath
+                )
+            }
+        }
+
+        return success
+    }
+
+    /**
      * 打卡成功通知
-     * 调用链：NotificationMonitorService.onNotificationPosted()
-     *       → MainActivity.onClockInSuccess()
-     *       → TaskScheduler.notifyClockIn()
-     * 效果：完成 clockInDeferred，select{} 走分支 B，推进到下一个任务
+     *
+     * 由 NotificationMonitorService 直接调用（不依赖 MainActivity 存活），
+     * 完成 clockInDeferred 后 select{} 走分支 B。
      */
     fun notifyClockIn() {
         clockInDeferred?.complete(Unit)
     }
-
     fun stopTask() {
         if (!_isRunning.value) {
             LogFileManager.writeLog("任务未运行，无需停止")

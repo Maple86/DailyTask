@@ -99,6 +99,9 @@ class NotificationMonitorService : NotificationListenerService() {
         if (SaveKeyValues.loadInt(Constant.RESULT_SOURCE_KEY, Constant.DEFAULT_INDEX) == 0) {
             if (pkg == targetApp && notice.contains("成功")) {
                 emitMonitorEvent(MonitorEvent.ClockInSuccess)
+
+                // 直接驱动调度器，避免依赖 MainActivity 是否存活
+                TaskScheduler.notifyClockIn()
                 "即将发送通知邮件，请注意查收".show(this)
                 val messageTitle =
                     SaveKeyValues.loadString(Constant.MESSAGE_TITLE_KEY, "打卡结果通知")

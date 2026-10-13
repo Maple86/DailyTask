@@ -339,7 +339,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private fun handleMonitorEvent(event: MonitorEvent) {
         when (event) {
             is MonitorEvent.ClockInSuccess -> {
-                TaskScheduler.notifyClockIn() // 通知 TaskScheduler：打卡成功，取消超时等待分支
+                // 打卡信号已由 NotificationMonitorService 直接驱动，这里只负责界面返回
                 backToMainActivity()
             }
 
