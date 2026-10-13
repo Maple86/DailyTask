@@ -45,6 +45,16 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 代码审查修复：打卡信号并发与取消安全
+- 审查发现上一提交存在的缺陷并全部修复。
+- **打卡信号并发覆盖**：`TaskScheduler` 原用对象级 `clockInDeferred` 承载等待，定时任务与远程打卡并发时会互相覆盖导致信号丢失。改为 `Channel<Unit>(Channel.CONFLATED)`，`waitForClockIn` 用 `clockInSignal.onReceive` 参与 `select`，`notifyClockIn()` 改 `trySend`。
+- **取消路径泄漏**：原实现仅在 `select` 正常返回后清理 `clockInDeferred`，被 `withTimeoutOrNull` 取消时会残留。现用 `try/finally` 统一清理，且等待前 `tryReceive()` 清空陈旧信号，避免上一次通知误判为本次成功。
+- **脱离调用方作用域**：倒计时任务原用 `CoroutineScope(Dispatchers.IO)` 独立作用域，取消不生效。改为 `coroutineScope { launch { ... } }` 子协程，调用方取消时一并取消。
+- **主线程回归**：`openApplication()` 原在 `Dispatchers.IO` 上执行（重构前由 `withContext(Dispatchers.Main)` 包裹），现恢复 `withContext(Dispatchers.Main)`。
+- **截屏失败通知丢失**：补回 `else` 分支，截屏失败时发送文本通知，避免整条超时路径静默。
+- **超时状态误报**：远程打卡超时由 `SUCCEEDED` 改为 `FAILED`，避免小程序列表显示绿色成功。
+- 验证：JDK 17 下 `:app:compileDebugKotlin`、`testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 全部通过。
+
 ### 2026-10-13 修复旧机型远程指令拉取与远程打卡流程
 - 问题：OPPO A3（ColorOS）会把前台服务杀掉，导致 `RemoteRelayCoordinator` 的 60 秒轮询停止；只剩 WorkManager 15 分钟周期任务，实际可能几十分钟才拉取一次指令，小程序端指令长期停留在 `PENDING`。
 - 新增 `RelaySyncAlarmReceiver` + `RemoteSyncScheduler` 的 `AlarmManager` 兜底（每 15 分钟，`setExactAndAllowWhileIdle`，无精确闹钟权限时回退 `setAndAllowWhileIdle`），唤醒后串起下一次闹钟并入队一次性 Worker。Manifest 新增 `USE_EXACT_ALARM` 权限与接收器声明；配对成功时注册、解绑时取消。

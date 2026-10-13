@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.google.gson.JsonObject
+import com.pengxh.daily.app.DailyTaskApplication
 import com.pengxh.daily.app.extensions.isApplicationExist
 import com.pengxh.daily.app.service.ForegroundRunningService
 import com.pengxh.daily.app.utils.Constant
@@ -59,7 +60,7 @@ object RemoteCommandProcessor {
             return action()
         }
 
-        val app = com.pengxh.daily.app.DailyTaskApplication.get()
+        val app = DailyTaskApplication.get()
         ContextCompat.startForegroundService(
             app,
             Intent(app, ForegroundRunningService::class.java)
@@ -91,7 +92,7 @@ object RemoteCommandProcessor {
         return if (ok) {
             CommandResult("SUCCEEDED", "打卡成功")
         } else {
-            CommandResult("SUCCEEDED", "已打开目标应用，但 ${timeoutSeconds}s 内未收到打卡成功通知")
+            CommandResult("FAILED", "已打开目标应用，但 ${timeoutSeconds}s 内未收到打卡成功通知")
         }
     }
 }

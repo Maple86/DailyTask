@@ -12,6 +12,8 @@ import com.pengxh.daily.app.sqlite.bean.DailyTaskBean
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -54,9 +56,14 @@ object TaskScheduler {
     private var job: Job? = null
 
     /**
-     * 打卡信号：外部 notifyClockIn() 触发，解除 select{} 阻塞
-     * */
-    private var clockInDeferred: CompletableDeferred<Unit>? = null
+     * 打卡成功信号。
+     *
+     * 使用 CONFLATED Channel 而非共享的 CompletableDeferred：
+     *   - 多个等待者不会互相覆盖，避免并发调用时信号丢失
+     *   - 无人等待时只有最新一次信号被暂存，不会无限堆积
+     *   - 每次等待前会清空陈旧信号，避免上一次通知被误判为本次成功
+     */
+    private val clockInSignal = Channel<Unit>(Channel.CONFLATED)
 
     private var lastProcessedDate: LocalDate? = null
 
@@ -262,16 +269,21 @@ object TaskScheduler {
     suspend fun waitForClockIn(
         timeoutSeconds: Int,
         captureOnTimeout: Boolean = false
-    ): Boolean {
-        DailyTaskApplication.get().openApplication()
+    ): Boolean = coroutineScope {
+        // 打开目标应用必须在主线程执行
+        withContext(Dispatchers.Main) {
+            DailyTaskApplication.get().openApplication()
+        }
 
-        val localDeferred = CompletableDeferred<Unit>()
-        clockInDeferred = localDeferred
+        // 清空上一次残留的成功信号，避免误判为本次打卡成功
+        clockInSignal.tryReceive()
 
         var hasCaptured = false
         var captureDeferred: CompletableDeferred<String?>? = null
 
-        val timeoutJob = CoroutineScope(Dispatchers.IO).launch {
+        // 使用子协程而非独立 CoroutineScope：
+        // 调用方被取消（例如远程指令超时）时，倒计时任务会一并取消
+        val timeoutJob = launch {
             updateCountdownWithNotification(timeoutSeconds * 1000L) { remaining ->
                 val tick = (remaining / 1000).toInt()
                 FloatingWindowController.updateTime(tick)
@@ -288,36 +300,43 @@ object TaskScheduler {
             }
         }
 
-        val success = select {
-            timeoutJob.onJoin { false }
-            localDeferred.onAwait { true }
-        }
-
-        timeoutJob.cancel()
-        clockInDeferred = null
-
-        if (!success && hasCaptured) {
-            val imagePath = withContext(Dispatchers.IO) {
-                runCatching { captureDeferred?.await() }.getOrNull() ?: ""
+        try {
+            val success = select {
+                timeoutJob.onJoin { false }
+                clockInSignal.onReceive { true }
             }
-            if (imagePath.isNotEmpty()) {
-                MessageDispatcher.sendAttachmentMessage(
-                    "任务执行结果通知", "任务执行结果见附件", imagePath
-                )
-            }
-        }
 
-        return success
+            if (!success && hasCaptured) {
+                val imagePath = withContext(Dispatchers.IO) {
+                    runCatching { captureDeferred?.await() }.getOrNull() ?: ""
+                }
+                if (imagePath.isNotEmpty()) {
+                    MessageDispatcher.sendAttachmentMessage(
+                        "任务执行结果通知", "任务执行结果见附件", imagePath
+                    )
+                } else {
+                    MessageDispatcher.sendMessage(
+                        "任务执行结果通知", "截屏失败，请手动检查打卡结果"
+                    )
+                }
+            }
+
+            success
+        } finally {
+            // 无论正常结束还是被取消，都清理倒计时任务与残留信号
+            timeoutJob.cancel()
+            clockInSignal.tryReceive()
+        }
     }
 
     /**
      * 打卡成功通知
      *
-     * 由 NotificationMonitorService 直接调用（不依赖 MainActivity 存活），
-     * 完成 clockInDeferred 后 select{} 走分支 B。
+     * 由 NotificationMonitorService 直接调用（不依赖 MainActivity 存活）。
+     * 通过 CONFLATED Channel 广播，多个等待者不会互相覆盖。
      */
     fun notifyClockIn() {
-        clockInDeferred?.complete(Unit)
+        clockInSignal.trySend(Unit)
     }
     fun stopTask() {
         if (!_isRunning.value) {
