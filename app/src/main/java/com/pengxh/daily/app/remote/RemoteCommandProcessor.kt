@@ -112,11 +112,15 @@ object RemoteCommandProcessor {
     }
 
     /**
-     * 息屏 / 亮屏：需要 MainActivity 持有窗口，通过 monitor 事件交由 UI 层执行。
+     * 下发依赖窗口的 UI 指令。
+     *
+     * 判断依据是 MainActivity 是否存活，而不是是否处于前台：
+     * 息屏后 Activity 会进入 onPause，若按「前台」判断，用户息屏后就无法再下发亮屏指令。
+     * 存活期间 MainActivity 的 lifecycleScope 仍在收集事件，可以正常处理。
      */
     private fun emitUiCommand(event: MonitorEvent, message: String): CommandResult {
-        if (!MainActivity.isInForeground) {
-            return CommandResult("FAILED", "应用不在前台，无法执行该操作，请先打开 DailyTask")
+        if (!MainActivity.isAlive) {
+            return CommandResult("FAILED", "应用未运行，无法执行该操作，请先打开 DailyTask")
         }
         NotificationMonitorService.emitMonitorEvent(event)
         return CommandResult("SUCCEEDED", message)

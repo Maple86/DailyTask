@@ -45,6 +45,13 @@
 
 > 每次提交或完成功能后在此追加，最新记录置顶。
 
+### 2026-10-13 修复 UI 指令存活判断：isInForeground 改为 isAlive
+- 缺陷：`SHOW_MASK` 息屏会触发 MainActivity 进入 `onPause`，原先按 `isInForeground` 判断导致 `onPause` 置假；用户息屏后，后续亮屏、再次息屏、截屏指令全部被拒绝，无法恢复屏幕。
+- 根因：依赖窗口的指令只需要 MainActivity 存活（`lifecycleScope` 仍在收集 `MonitorEvent`），不需要处于前台。
+- 修复：`MainActivity` 的标记更名并改语义为 `isAlive` —— `onCreate` 置真、`onDestroy` 置假，**不再随 onPause / onResume 变化**；移除 `onPause` 中的置假逻辑。
+- `RemoteCommandProcessor.emitUiCommand()` 改判 `MainActivity.isAlive`，失败提示改为「应用未运行，无法执行该操作，请先打开 DailyTask」。
+- 验证：`:app:compileDebugKotlin`、`testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 全部通过；真机安装后启动 30 秒无崩溃。
+
 ### 2026-10-13 远程快捷操作复刻聊天指令（息屏/亮屏/考勤记录/截屏）
 - 需求：小程序快捷操作复刻原有 `DT#` 聊天指令能力，新增【息屏】【考勤记录】【截屏】（同时补上反向的【亮屏】）。
 - 新增指令：`SHOW_MASK`（息屏）、`HIDE_MASK`（亮屏）、`SCREENSHOT`（截屏）、`ATTENDANCE_REPORT`（考勤记录）。

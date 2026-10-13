@@ -64,13 +64,13 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     companion object {
         /**
-         * MainActivity 是否处于前台。
+         * MainActivity 是否存活。
          *
          * 息屏 / 亮屏 / 截屏等指令依赖窗口，只有 Activity 可交互时才能执行。
          * 远程指令据此判断能否下发 UI 指令，避免误报执行成功。
          */
         @Volatile
-        var isInForeground: Boolean = false
+        var isAlive: Boolean = false
             private set
     }
 
@@ -309,14 +309,13 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        isInForeground = false
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        isAlive = true
     }
 
     override fun onResume() {
         super.onResume()
-        isInForeground = true
         if (!Settings.canDrawOverlays(this)) {
             "悬浮窗权限未开启，部分功能可能无法正常使用".show(this)
         }
@@ -343,7 +342,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     override fun onDestroy() {
         super.onDestroy()
-        isInForeground = false
+        isAlive = false
         mainHandler.removeCallbacksAndMessages(null)
         maskViewController.destroy()
     }
